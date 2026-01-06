@@ -1,0 +1,4 @@
+lgpio==0.2.2.0
+click==8.3.1
+w1thermsensor==2.3.0
+
