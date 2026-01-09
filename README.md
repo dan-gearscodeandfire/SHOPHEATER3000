@@ -3,7 +3,8 @@
 Integrated shop heater control system combining multiple Raspberry Pi GPIO modules.
 
 **Created:** January 6, 2026  
-**Status:** Consolidated virtual environment ready, awaiting hardware integration
+**Last Updated:** January 9, 2026  
+**Status:** Web UI complete, all modules tested and operational
 
 ---
 
@@ -11,11 +12,16 @@ Integrated shop heater control system combining multiple Raspberry Pi GPIO modul
 
 **Getting Started:**
 - [Overview](#overview) - System overview
+- [Web UI](#web-ui) - **NEW!** Real-time web interface
 - [Setup Instructions](#setup-instructions) - How to get started
 - [Integration Example](#integration-example) - Working code example
 
 **Module Documentation:**
 - All module details are in this README and source files
+
+**Web Interface:**
+- [INSTALLATION_GUIDE.md](INSTALLATION_GUIDE.md) - Quick start guide for web UI
+- [WEB_UI_README.md](WEB_UI_README.md) - Complete web UI documentation
 
 **Troubleshooting:**
 - [SOLVED_PROBLEMS.md](SOLVED_PROBLEMS.md) - Complete history of all problems encountered and solved
@@ -46,6 +52,9 @@ A single `.venv` has been created with all dependencies from the four source cod
 lgpio==0.2.2.0           # GPIO library (unified across all GPIO modules)
 click==8.3.1             # CLI framework (dependency of w1thermsensor)
 w1thermsensor==2.3.0     # DS18B20 temperature sensor library
+fastapi==0.109.0         # Web framework for real-time UI
+uvicorn==0.27.0          # ASGI server for FastAPI
+websockets==12.0         # WebSocket support for real-time updates
 ```
 
 ### Key Change: RPi.GPIO → lgpio Migration
@@ -131,6 +140,46 @@ All controller classes are now copied to this directory for easy integration.
   - Individual GPIO control
 - **Status:** ✅ Already used lgpio
 - **Class:** `RelayController`
+
+---
+
+## Web UI
+
+**NEW!** A complete real-time web interface for monitoring and controlling the shop heater system.
+
+### Quick Start
+
+```bash
+cd ~/SHOPHEATER3000
+source .venv/bin/activate
+python shopheater3000.py
+```
+
+Then open a browser to: **http://localhost:8000** (or http://[pi-ip]:8000 from another device)
+
+### Features
+
+**Real-Time Monitoring (updates every 0.5 seconds):**
+- 6 temperature sensors (water_hot, water_reservoir, water_mix, water_cold, air_cool, air_heated)
+- 3 calculated temperature deltas (heater, radiator, air)
+- Flow rate (L/min)
+- Current fan speed
+
+**User Controls:**
+- Main loop solenoid toggle
+- Diversion solenoid toggle
+- Fan speed control (0-100) with synchronized text input and slider
+
+**Technology:**
+- FastAPI backend with WebSocket for bidirectional communication
+- ~1-5ms latency for control commands
+- Automatic reconnection on disconnect
+- Visual flow diagram with live data overlay
+
+### Documentation
+
+- **[INSTALLATION_GUIDE.md](INSTALLATION_GUIDE.md)** - Quick installation and startup
+- **[WEB_UI_README.md](WEB_UI_README.md)** - Complete feature documentation, API reference, troubleshooting
 
 ---
 
@@ -322,11 +371,17 @@ python relay_control.py
 │
 ├── README.md                           # This file (integration guide)
 ├── MIGRATION_SUMMARY.md                # Migration notes
+├── INSTALLATION_GUIDE.md               # Web UI quick start guide
+├── WEB_UI_README.md                    # Complete web UI documentation
 │
 ├── bts7960_controller.py               # Fan controller class
 ├── ds18b20_reader.py                   # Temperature sensor class
 ├── flowmeter.py                        # Flow meter class
 ├── relay_control.py                    # Relay controller class
+│
+├── shopheater3000.py                   # Web server with real-time UI
+├── web_ui.html                         # Web interface frontend
+├── images/                             # Icons for web UI flow diagram
 │
 ├── example_integration.py              # Complete integration example
 ├── verify_setup.py                     # Setup verification script
@@ -355,6 +410,17 @@ Each source codebase maintains its original license. Integration code is provide
 
 ## Changelog
 
+### 2026-01-09 (Web UI Added)
+- **NEW:** Real-time web interface with FastAPI + WebSocket
+- Added `shopheater3000.py` - Main web server with hardware integration
+- Added `web_ui.html` - Real-time monitoring and control interface
+- Added FastAPI, uvicorn, websockets to dependencies
+- Created comprehensive web UI documentation (WEB_UI_README.md, INSTALLATION_GUIDE.md)
+- Implemented bidirectional WebSocket communication (0.5s update rate)
+- Temperature conversion to Fahrenheit with delta calculations
+- User controls: fan speed (0-100), main loop toggle, diversion toggle
+- Visual flow diagram with live sensor data overlay
+
 ### 2026-01-06 (Initial Integration)
 - **02:00 UTC** - Completed integration testing with all 4 modules working
 - Created consolidated virtual environment
@@ -369,7 +435,7 @@ Each source codebase maintains its original license. Integration code is provide
 
 ---
 
-**Last Updated:** January 6, 2026 02:00 UTC  
-**System Status:** ✅ All modules tested and working  
-**Integration Test:** Passed - Temperature sensors (4x), fan control, relays, flow meter all operational
+**Last Updated:** January 9, 2026  
+**System Status:** ✅ All modules tested and working, Web UI operational  
+**Integration Test:** Passed - Temperature sensors (6x), fan control, relays, flow meter, web interface all operational
 
