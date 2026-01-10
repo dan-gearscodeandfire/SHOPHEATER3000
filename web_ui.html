@@ -429,9 +429,13 @@ function updateValue(elementId, value, unit = '') {
   if (element) {
     if (value !== null && value !== undefined) {
       element.textContent = value + unit;
+      console.log(`Updated ${elementId}: ${value}${unit}`);
     } else {
       element.textContent = '--';
+      console.log(`Updated ${elementId}: -- (null/undefined)`);
     }
+  } else {
+    console.error(`Element not found: ${elementId}`);
   }
 }
 
