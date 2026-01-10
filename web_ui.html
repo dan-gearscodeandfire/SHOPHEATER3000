@@ -367,12 +367,19 @@ function connectWebSocket() {
   };
   
   ws.onmessage = (event) => {
-    const data = JSON.parse(event.data);
-    updateDisplay(data);
+    console.log('WebSocket message received:', event.data.substring(0, 100) + '...');
+    try {
+      const data = JSON.parse(event.data);
+      console.log('Parsed data:', data);
+      updateDisplay(data);
+    } catch (e) {
+      console.error('Error parsing message:', e);
+    }
   };
 }
 
 function updateDisplay(data) {
+  console.log('updateDisplay called with:', data);
   // Update temperatures
   const temps = data.temperatures;
   updateValue('water_hot', temps.water_hot, '°F');
@@ -429,8 +436,12 @@ function updateValue(elementId, value, unit = '') {
 }
 
 function sendCommand(command) {
+  console.log('Sending command:', command);
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify(command));
+    console.log('Command sent successfully');
+  } else {
+    console.error('WebSocket not open. State:', ws ? ws.readyState : 'null');
   }
 }
 

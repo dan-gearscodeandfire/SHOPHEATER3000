@@ -221,6 +221,7 @@ async def sensor_broadcast_loop():
     Background task that reads sensors and broadcasts to all connected clients.
     Updates every 0.5 seconds.
     """
+    print("Sensor broadcast loop started")
     while True:
         await asyncio.sleep(0.5)  # Update every 500ms
         
@@ -228,6 +229,7 @@ async def sensor_broadcast_loop():
             try:
                 data = controller.read_sensor_data()
                 message = json.dumps(data)
+                print(f"Broadcasting to {len(active_connections)} clients: {len(message)} bytes")
                 
                 # Broadcast to all connected clients
                 disconnected = []
@@ -242,6 +244,7 @@ async def sensor_broadcast_loop():
                 for connection in disconnected:
                     if connection in active_connections:
                         active_connections.remove(connection)
+                        print(f"Removed disconnected client. Remaining: {len(active_connections)}")
             except Exception as e:
                 print(f"Error in sensor broadcast: {e}")
                 import traceback
@@ -259,9 +262,14 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         if controller:
             data = controller.read_sensor_data()
-            await websocket.send_text(json.dumps(data))
+            message = json.dumps(data)
+            print(f"Sending initial data to client: {len(message)} bytes")
+            await websocket.send_text(message)
+            print("Initial data sent successfully")
     except Exception as e:
         print(f"Error sending initial data: {e}")
+        import traceback
+        traceback.print_exc()
     
     try:
         while True:
