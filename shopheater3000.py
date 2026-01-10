@@ -23,6 +23,17 @@ from relay_control import RelayController
 class ShopHeaterController:
     """Main controller integrating all hardware modules."""
     
+    # Sensor calibration offsets from ice water test (Jan 9, 2026)
+    # Subtract these values from raw Celsius readings to get calibrated temps
+    SENSOR_OFFSETS = {
+        '4460008751fe': -0.75,   # Reads 0.75°C high
+        '3c52f648a463': 0.00,    # Perfect reference sensor
+        '3cf7f6496d4f': 0.00,    # Perfect in latest test
+        '031294970b3f': +1.00,   # Reads 1.00°C low
+        '3ca4f649bbd0': -0.81,   # Reads 0.81°C high
+        '158200872bfa': -0.38    # Reads 0.38°C high
+    }
+    
     def __init__(self):
         """Initialize all hardware modules."""
         print("Initializing Shop Heater Controller...")
@@ -82,10 +93,15 @@ class ShopHeaterController:
         
         return sensor_map
     
-    def celsius_to_fahrenheit(self, celsius: Optional[float]) -> Optional[float]:
-        """Convert Celsius to Fahrenheit, rounded to 0.1 places."""
+    def celsius_to_fahrenheit(self, celsius: Optional[float], sensor_id: Optional[str] = None) -> Optional[float]:
+        """Convert Celsius to Fahrenheit with calibration, rounded to 0.1 places."""
         if celsius is None:
             return None
+        
+        # Apply calibration offset if sensor_id provided
+        if sensor_id and sensor_id in self.SENSOR_OFFSETS:
+            celsius += self.SENSOR_OFFSETS[sensor_id]
+        
         fahrenheit = (celsius * 9/5) + 32
         return round(fahrenheit, 1)
     
@@ -97,11 +113,12 @@ class ShopHeaterController:
         # Read all temperatures
         all_temps = self.temp_reader.read_all_temperatures()
         
-        # Map to logical names and convert to Fahrenheit
+        # Map to logical names and convert to Fahrenheit with calibration
         temps = {}
         for name, sensor_id in self.sensor_map.items():
             if sensor_id and sensor_id in all_temps:
-                temps[name] = self.celsius_to_fahrenheit(all_temps[sensor_id])
+                # Pass sensor_id for calibration
+                temps[name] = self.celsius_to_fahrenheit(all_temps[sensor_id], sensor_id)
             else:
                 temps[name] = None
         
