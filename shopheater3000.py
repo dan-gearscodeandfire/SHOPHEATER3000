@@ -298,6 +298,11 @@ async def websocket_endpoint(websocket: WebSocket):
                 
                 if 'diversion' in command:
                     controller.set_diversion(bool(command['diversion']))
+                
+                # Immediately send updated state back to client after command
+                updated_data = controller.read_sensor_data()
+                await websocket.send_text(json.dumps(updated_data))
+                print(f"Sent immediate state update after command: {command}")
     
     except WebSocketDisconnect:
         if websocket in active_connections:
