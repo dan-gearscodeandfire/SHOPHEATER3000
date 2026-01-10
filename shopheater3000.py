@@ -234,14 +234,18 @@ async def sensor_broadcast_loop():
                 for connection in active_connections:
                     try:
                         await connection.send_text(message)
-                    except:
+                    except Exception as e:
+                        print(f"Error sending to client: {e}")
                         disconnected.append(connection)
                 
                 # Remove disconnected clients
                 for connection in disconnected:
-                    active_connections.remove(connection)
+                    if connection in active_connections:
+                        active_connections.remove(connection)
             except Exception as e:
                 print(f"Error in sensor broadcast: {e}")
+                import traceback
+                traceback.print_exc()
 
 
 @app.websocket("/ws")
@@ -250,6 +254,14 @@ async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     active_connections.append(websocket)
     print(f"Client connected. Total connections: {len(active_connections)}")
+    
+    # Send initial data immediately
+    try:
+        if controller:
+            data = controller.read_sensor_data()
+            await websocket.send_text(json.dumps(data))
+    except Exception as e:
+        print(f"Error sending initial data: {e}")
     
     try:
         while True:
@@ -269,10 +281,13 @@ async def websocket_endpoint(websocket: WebSocket):
                     controller.set_diversion(bool(command['diversion']))
     
     except WebSocketDisconnect:
-        active_connections.remove(websocket)
+        if websocket in active_connections:
+            active_connections.remove(websocket)
         print(f"Client disconnected. Total connections: {len(active_connections)}")
     except Exception as e:
         print(f"WebSocket error: {e}")
+        import traceback
+        traceback.print_exc()
         if websocket in active_connections:
             active_connections.remove(websocket)
 
