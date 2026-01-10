@@ -62,34 +62,26 @@ class ShopHeaterController:
     def _initialize_sensor_map(self) -> Dict[str, Optional[str]]:
         """
         Initialize sensor mapping.
-        Maps logical names to sensor IDs.
-        If sensors are not yet assigned, they will be None.
+        Maps logical names to specific sensor IDs assigned by user.
         """
         sensor_ids = self.temp_reader.get_sensor_addresses()
         
-        # Create mapping structure
-        # Initially, we'll assign sensors in order if 6 are found
-        # User can modify this mapping later
-        sensor_names = [
-            'water_hot',
-            'water_reservoir', 
-            'water_mix',
-            'water_cold',
-            'air_cool',
-            'air_heated'
-        ]
-        
-        sensor_map = {}
-        for i, name in enumerate(sensor_names):
-            if i < len(sensor_ids):
-                sensor_map[name] = sensor_ids[i]
-            else:
-                sensor_map[name] = None
+        # Specific sensor assignments (identified Jan 9, 2026)
+        sensor_map = {
+            'water_hot': '3ca4f649bbd0',
+            'water_mix': '3cf7f6496d4f',
+            'water_cold': '158200872bfa',
+            'water_reservoir': '3c52f648a463',
+            'air_heated': '4460008751fe',
+            'air_cool': '031294970b3f'
+        }
         
         print(f"Found {len(sensor_ids)} temperature sensors")
         print("Sensor mapping:")
         for name, sensor_id in sensor_map.items():
-            print(f"  {name}: {sensor_id if sensor_id else 'NOT ASSIGNED'}")
+            # Check if assigned sensor is actually present
+            status = "✓" if sensor_id in sensor_ids else "✗ NOT FOUND"
+            print(f"  {name}: {sensor_id} {status}")
         
         return sensor_map
     
