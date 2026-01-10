@@ -337,10 +337,6 @@
 let ws = null;
 let reconnectInterval = null;
 
-// Track when user makes changes to prevent server overrides
-let lastUserActionTime = 0;
-const USER_ACTION_DEBOUNCE_MS = 1500; // Ignore server updates for 1.5s after user action
-
 function connectWebSocket() {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const wsUrl = `${protocol}//${window.location.host}/ws`;
@@ -384,8 +380,7 @@ function connectWebSocket() {
 
 function updateDisplay(data) {
   console.log('updateDisplay called with:', data);
-  
-  // Always update sensor readings (not affected by user actions)
+  // Update temperatures
   const temps = data.temperatures;
   updateValue('water_hot', temps.water_hot, '°F');
   updateValue('water_reservoir', temps.water_reservoir, '°F');
@@ -405,15 +400,6 @@ function updateDisplay(data) {
   
   // Update fan speed display
   updateValue('fan_speed_display', data.fan_speed, '%');
-  
-  // Check if we should ignore control updates (user just made a change)
-  const timeSinceUserAction = Date.now() - lastUserActionTime;
-  const ignoreControlUpdates = timeSinceUserAction < USER_ACTION_DEBOUNCE_MS;
-  
-  if (ignoreControlUpdates) {
-    console.log(`Ignoring control updates (${Math.round(USER_ACTION_DEBOUNCE_MS - timeSinceUserAction)}ms remaining)`);
-    return;
-  }
   
   // Update control states (without triggering change events)
   const mainLoopToggle = document.getElementById('mainLoopToggle');
@@ -455,10 +441,6 @@ function updateValue(elementId, value, unit = '') {
 
 function sendCommand(command) {
   console.log('Sending command:', command);
-  
-  // Mark that user just made an action
-  lastUserActionTime = Date.now();
-  
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify(command));
     console.log('Command sent successfully');
