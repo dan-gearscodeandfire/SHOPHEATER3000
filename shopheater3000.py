@@ -202,10 +202,21 @@ active_connections: list[WebSocket] = []
 async def startup_event():
     """Initialize hardware on startup."""
     global controller
-    controller = ShopHeaterController()
-    
-    # Start background task for sensor reading
-    asyncio.create_task(sensor_broadcast_loop())
+    print("=" * 60)
+    print("STARTUP EVENT TRIGGERED")
+    print("=" * 60)
+    try:
+        controller = ShopHeaterController()
+        print("Controller initialized successfully in startup event")
+        
+        # Start background task for sensor reading
+        asyncio.create_task(sensor_broadcast_loop())
+        print("Background task created")
+    except Exception as e:
+        print(f"ERROR IN STARTUP: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
 
 
 @app.on_event("shutdown")
