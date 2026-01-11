@@ -553,9 +553,11 @@ function updateArrowColorOnly(elementId, color, suffix) {
 function updateArrowImage(elementId, color, suffix, transform) {
   const element = document.getElementById(elementId);
   if (element) {
-    element.src = `images/256_arrow_${color}${suffix}.png`;
+    const newSrc = `images/256_arrow_${color}${suffix}.png`;
+    element.src = newSrc;
     if (transform !== undefined) {
       element.style.transform = transform;
+      console.log(`Set ${elementId}: src=${newSrc}, transform=${transform}`);
     }
   }
 }
@@ -589,7 +591,7 @@ function updateArrowVisibility(flowMode, temps) {
     // Show and configure visible arrows
     if (arrow_0_1) {
       arrow_0_1.style.visibility = 'visible';
-      updateArrowImage('arrow_0_1', hotColor, '_90', 'rotate(90deg)'); // 90° CW
+      updateArrowImage('arrow_0_1', hotColor, '_90', 'rotate(270deg)'); // 270° (was 90° + 180°)
     }
     if (arrow_1_1) {
       arrow_1_1.style.visibility = 'visible';
@@ -601,7 +603,7 @@ function updateArrowVisibility(flowMode, temps) {
     }
     if (arrow_3_1) {
       arrow_3_1.style.visibility = 'visible';
-      updateArrowImage('arrow_3_1', mixColor, '_90', 'rotate(90deg)'); // 90° CW
+      updateArrowImage('arrow_3_1', mixColor, '_90', 'rotate(180deg)'); // 180° (was 90° + 90°)
     }
     
   } else if (flowMode === 'diversion') {
@@ -613,23 +615,23 @@ function updateArrowVisibility(flowMode, temps) {
     // Show and configure others with special directions
     if (arrow_0_1) {
       arrow_0_1.style.visibility = 'visible';
-      updateArrowImage('arrow_0_1', hotColor, '', 'rotate(180deg)'); // 180° rotation
+      updateArrowImage('arrow_0_1', hotColor, '', 'rotate(180deg)'); // 180° rotation (no change)
     }
     if (arrow_1_0) {
       arrow_1_0.style.visibility = 'visible';
-      updateArrowImage('arrow_1_0', hotColor, '', 'rotate(90deg)'); // Pointing DOWN
+      updateArrowImage('arrow_1_0', hotColor, '', 'rotate(90deg)'); // Pointing DOWN (no change)
     }
     if (arrow_3_0) {
       arrow_3_0.style.visibility = 'visible';
-      updateArrowImage('arrow_3_0', mixColor, '_90', 'rotate(90deg)'); // 90° CW
+      updateArrowImage('arrow_3_0', mixColor, '_90', 'rotate(180deg)'); // 180° (was 90° + 90°)
     }
     if (arrow_3_1) {
       arrow_3_1.style.visibility = 'visible';
-      updateArrowImage('arrow_3_1', mixColor, '', 'rotate(-90deg)'); // 90° CCW
+      updateArrowImage('arrow_3_1', mixColor, '', 'rotate(0deg)'); // 0° (was -90° + 90°)
     }
     if (arrow_0_0) {
       arrow_0_0.style.visibility = 'visible';
-      updateArrowImage('arrow_0_0', hotColor, '_90', 'rotate(180deg)'); // 180° CW
+      updateArrowImage('arrow_0_0', hotColor, '_90', 'rotate(270deg)'); // 270° (was 180° + 90°)
     }
     
   } else if (flowMode === 'mix') {
@@ -637,31 +639,31 @@ function updateArrowVisibility(flowMode, temps) {
     // Show all arrows, with branching arrows at 0:1 and 3:1
     if (arrow_0_0) {
       arrow_0_0.style.visibility = 'visible';
-      updateArrowImage('arrow_0_0', hotColor, '_90', 'rotate(180deg)'); // 180° CW
+      updateArrowImage('arrow_0_0', hotColor, '_90', 'rotate(270deg)'); // 270° (was 180° + 90°)
     }
     if (arrow_0_1) {
       arrow_0_1.style.visibility = 'visible';
-      updateArrowImage('arrow_0_1', hotColor, '_branch', 'rotate(180deg)'); // 180° CW (BRANCHING arrow)
+      updateArrowImage('arrow_0_1', hotColor, '_branch', 'rotate(0deg)'); // 0° or 360° (was 180° + 180°)
     }
     if (arrow_1_0) {
       arrow_1_0.style.visibility = 'visible';
-      updateArrowImage('arrow_1_0', hotColor, '', 'rotate(90deg)'); // DOWN arrow
+      updateArrowImage('arrow_1_0', hotColor, '', 'rotate(90deg)'); // DOWN arrow (no change)
     }
     if (arrow_1_1) {
       arrow_1_1.style.visibility = 'visible';
-      updateArrowImage('arrow_1_1', hotColor, '', 'rotate(90deg)'); // DOWN arrow
+      updateArrowImage('arrow_1_1', hotColor, '', 'rotate(90deg)'); // DOWN arrow (no change)
     }
     if (arrow_2_1) {
       arrow_2_1.style.visibility = 'visible';
-      updateArrowImage('arrow_2_1', hotColor, '', 'rotate(90deg)'); // DOWN arrow
+      updateArrowImage('arrow_2_1', hotColor, '', 'rotate(90deg)'); // DOWN arrow (no change)
     }
     if (arrow_3_0) {
       arrow_3_0.style.visibility = 'visible';
-      updateArrowImage('arrow_3_0', reservoirColor, '_90', 'rotate(90deg)'); // Uses water_reservoir color
+      updateArrowImage('arrow_3_0', reservoirColor, '_90', 'rotate(180deg)'); // 180° (was 90° + 90°)
     }
     if (arrow_3_1) {
       arrow_3_1.style.visibility = 'visible';
-      updateArrowImage('arrow_3_1', mixColor, '_branch', 'rotate(90deg)'); // BRANCHING arrow
+      updateArrowImage('arrow_3_1', mixColor, '_branch', 'rotate(180deg)'); // 180° (was 90° + 90°)
     }
     
   } else {
