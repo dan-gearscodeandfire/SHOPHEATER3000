@@ -329,7 +329,7 @@
   <div class="cell"><img id="arrow_0_5" src="images/256_arrow_blue_90.png"></div>
 
   <!-- Row 1 -->
-  <div class="cell"><img id="arrow_1_0" src="images/256_arrow_red.png" style="transform: rotate(90deg);"></div>
+  <div class="cell"><img id="reservoir_img" src="images/256_reservoir.png"></div>
   <div class="cell"><img id="arrow_1_1" src="images/256_arrow_red.png" style="transform: rotate(90deg);"></div>
   <div class="cell">
     <div class="label">HOT</div>
@@ -347,8 +347,8 @@
 
   <!-- Row 2 -->
   <div class="cell">
-    <img src="images/256_reservoir.png">
-    <div class="overlay-value temp-value" id="water_reservoir">--</div>
+    <div class="label">RESERVOIR</div>
+    <div class="value temp-value" id="water_reservoir">--</div>
   </div>
   <div class="cell"><img id="arrow_2_1" src="images/256_arrow_red.png" style="transform: rotate(90deg);"></div>
   <div class="cell">
@@ -541,6 +541,22 @@ function getTemperatureColor(temperature) {
   }
 }
 
+// Update reservoir image based on temperature
+function updateReservoirImage(temperature) {
+  const reservoirImg = document.getElementById('reservoir_img');
+  if (!reservoirImg) return;
+  
+  if (temperature === null || temperature === undefined) {
+    reservoirImg.src = 'images/256_reservoir.png'; // Default blue
+  } else if (temperature > 120) {
+    reservoirImg.src = 'images/256_reservoir_hot.png'; // Red/hot
+  } else if (temperature >= 70) {
+    reservoirImg.src = 'images/256_reservoir_warm.png'; // Orange/warm
+  } else {
+    reservoirImg.src = 'images/256_reservoir.png'; // Blue/cold
+  }
+}
+
 // Update arrow colors for STATIC arrows only (never change type/rotation)
 // Dynamic arrows (0:0, 0:1, 1:0, 1:1, 2:1, 3:0, 3:1) are handled entirely by updateArrowVisibility()
 function updateArrowColors(data) {
@@ -601,7 +617,6 @@ function updateArrowVisibility(flowMode, temps) {
   // Get all arrow cells
   const arrow_0_0 = document.getElementById('arrow_0_0');
   const arrow_0_1 = document.getElementById('arrow_0_1');
-  const arrow_1_0 = document.getElementById('arrow_1_0');
   const arrow_1_1 = document.getElementById('arrow_1_1');
   const arrow_2_1 = document.getElementById('arrow_2_1');
   const arrow_3_0 = document.getElementById('arrow_3_0');
@@ -609,9 +624,8 @@ function updateArrowVisibility(flowMode, temps) {
   
   if (flowMode === 'main') {
     // Main mode: main ON, diversion OFF
-    // Hide: 0:0, 1:0, 3:0 (hide the image only, not the cell)
+    // Hide: 0:0, 3:0 (hide the image only, not the cell)
     if (arrow_0_0) arrow_0_0.style.visibility = 'hidden';
-    if (arrow_1_0) arrow_1_0.style.visibility = 'hidden';
     if (arrow_3_0) arrow_3_0.style.visibility = 'hidden';
     
     // Show and configure visible arrows
@@ -643,10 +657,6 @@ function updateArrowVisibility(flowMode, temps) {
       arrow_0_1.style.visibility = 'visible';
       updateArrowImage('arrow_0_1', hotColor, '', 'rotate(180deg)'); // 180° rotation (no change)
     }
-    if (arrow_1_0) {
-      arrow_1_0.style.visibility = 'visible';
-      updateArrowImage('arrow_1_0', hotColor, '', 'rotate(90deg)'); // Pointing DOWN (no change)
-    }
     if (arrow_3_0) {
       arrow_3_0.style.visibility = 'visible';
       updateArrowImage('arrow_3_0', mixColor, '_90', 'rotate(180deg)'); // 180° (was 90° + 90°)
@@ -671,10 +681,6 @@ function updateArrowVisibility(flowMode, temps) {
       arrow_0_1.style.visibility = 'visible';
       updateArrowImage('arrow_0_1', hotColor, '_branch', 'rotate(0deg)'); // 0° or 360° (was 180° + 180°)
     }
-    if (arrow_1_0) {
-      arrow_1_0.style.visibility = 'visible';
-      updateArrowImage('arrow_1_0', hotColor, '', 'rotate(90deg)'); // DOWN arrow (no change)
-    }
     if (arrow_1_1) {
       arrow_1_1.style.visibility = 'visible';
       updateArrowImage('arrow_1_1', hotColor, '', 'rotate(90deg)'); // DOWN arrow (no change)
@@ -697,7 +703,6 @@ function updateArrowVisibility(flowMode, temps) {
     console.warn(`Unknown flow mode: ${flowMode}, showing all arrows with default colors`);
     if (arrow_0_0) arrow_0_0.style.visibility = 'visible';
     if (arrow_0_1) arrow_0_1.style.visibility = 'visible';
-    if (arrow_1_0) arrow_1_0.style.visibility = 'visible';
     if (arrow_1_1) arrow_1_1.style.visibility = 'visible';
     if (arrow_2_1) arrow_2_1.style.visibility = 'visible';
     if (arrow_3_0) arrow_3_0.style.visibility = 'visible';
@@ -721,6 +726,9 @@ function updateDisplay(data) {
   updateTemperatureValue('water_cold', temps.water_cold, '°');
   updateTemperatureValue('air_cool', temps.air_cool, '°');
   updateTemperatureValue('air_heated', temps.air_heated, '°');
+  
+  // Update reservoir image based on temperature
+  updateReservoirImage(temps.water_reservoir);
   
   // Update arrow visibility and direction based on flow mode FIRST
   // (This sets type, color, and rotation for dynamic arrows)
