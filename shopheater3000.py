@@ -53,10 +53,14 @@ class ShopHeaterController:
         self.main_loop_state = False  # False=off (HIGH), True=on (LOW)
         self.diversion_state = False  # False=off (HIGH), True=on (LOW)
         self.control_mode = 'manual'  # 'manual' or 'automatic'
+        self.flow_mode = 'main'  # 'main', 'diversion', or 'mix'
         
         # Set initial safe state
         self.valve_control.all_closed()
         self.fan.set_speed(0)
+        
+        # Calculate initial flow mode based on valve states
+        self.calculate_flow_mode()
         
         print("Controller initialized successfully")
     
@@ -143,7 +147,8 @@ class ShopHeaterController:
             'fan_speed': self.current_fan_speed,
             'main_loop_state': self.main_loop_state,
             'diversion_state': self.diversion_state,
-            'control_mode': self.control_mode
+            'control_mode': self.control_mode,
+            'flow_mode': self.flow_mode
         }
         
         return data
@@ -167,6 +172,7 @@ class ShopHeaterController:
             self.valve_control.normal_high()  # Turn off
         self.main_loop_state = state
         print(f"Main loop: {'ON' if state else 'OFF'}")
+        self.calculate_flow_mode()
     
     def set_diversion(self, state: bool):
         """
@@ -180,6 +186,7 @@ class ShopHeaterController:
             self.valve_control.diversion_high()  # Turn off
         self.diversion_state = state
         print(f"Diversion: {'ON' if state else 'OFF'}")
+        self.calculate_flow_mode()
     
     def set_control_mode(self, mode: str):
         """
@@ -192,6 +199,23 @@ class ShopHeaterController:
             print(f"Control mode set to: {mode.upper()}")
         else:
             print(f"Invalid control mode: {mode}. Must be 'manual' or 'automatic'.")
+    
+    def calculate_flow_mode(self):
+        """
+        Calculate current flow mode based on valve states.
+        Returns: 'main', 'diversion', or 'mix'
+        """
+        if self.main_loop_state and self.diversion_state:
+            self.flow_mode = 'mix'
+        elif self.main_loop_state and not self.diversion_state:
+            self.flow_mode = 'main'
+        elif not self.main_loop_state and self.diversion_state:
+            self.flow_mode = 'diversion'
+        else:
+            # Both off - should not happen in normal operation
+            self.flow_mode = 'none'
+        
+        print(f"Flow mode calculated: {self.flow_mode.upper()} (main={self.main_loop_state}, diversion={self.diversion_state})")
     
     def cleanup(self):
         """Clean up all hardware resources."""

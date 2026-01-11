@@ -308,16 +308,16 @@
 <div class="grid">
 
   <!-- Row 0 -->
-  <div class="cell"><img src="images/256_arrow_red_90.png" style="transform: rotate(180deg);"></div>
-  <div class="cell"><img src="images/256_arrow_red_90.png" style="transform: rotate(180deg);"></div>
-  <div class="cell"><img src="images/256_arrow_red.png" style="transform: rotate(180deg);"></div>
+  <div class="cell"><img id="arrow_0_0" src="images/256_arrow_red_90.png" style="transform: rotate(180deg);"></div>
+  <div class="cell"><img id="arrow_0_1" src="images/256_arrow_red_90.png" style="transform: rotate(180deg);"></div>
+  <div class="cell"><img id="arrow_0_2" src="images/256_arrow_red.png" style="transform: rotate(180deg);"></div>
   <div class="cell"><img src="images/256_heater.png"></div>
-  <div class="cell"><img src="images/256_arrow_blue.png" style="transform: rotate(180deg);"></div>
-  <div class="cell"><img src="images/256_arrow_blue_90.png"></div>
+  <div class="cell"><img id="arrow_0_4" src="images/256_arrow_blue.png" style="transform: rotate(180deg);"></div>
+  <div class="cell"><img id="arrow_0_5" src="images/256_arrow_blue_90.png"></div>
 
   <!-- Row 1 -->
-  <div class="cell"><img src="images/256_arrow_red.png" style="transform: rotate(90deg);"></div>
-  <div class="cell"><img src="images/256_arrow_red.png" style="transform: rotate(90deg);"></div>
+  <div class="cell"><img id="arrow_1_0" src="images/256_arrow_red.png" style="transform: rotate(90deg);"></div>
+  <div class="cell"><img id="arrow_1_1" src="images/256_arrow_red.png" style="transform: rotate(90deg);"></div>
   <div class="cell">
     <div class="label">HOT</div>
     <div class="value temp-value" id="water_hot">--</div>
@@ -330,14 +330,14 @@
     <div class="label">COLD</div>
     <div class="value temp-value" id="water_cold">--</div>
   </div>
-  <div class="cell"><img src="images/256_arrow_blue.png" style="transform: rotate(-90deg);"></div>
+  <div class="cell"><img id="arrow_1_5" src="images/256_arrow_blue.png" style="transform: rotate(-90deg);"></div>
 
   <!-- Row 2 -->
   <div class="cell">
     <img src="images/256_reservoir.png">
     <div class="overlay-value temp-value" id="water_reservoir">--</div>
   </div>
-  <div class="cell"><img src="images/256_arrow_red.png" style="transform: rotate(90deg);"></div>
+  <div class="cell"><img id="arrow_2_1" src="images/256_arrow_red.png" style="transform: rotate(90deg);"></div>
   <div class="cell">
     <div class="label">MIX</div>
     <div class="value temp-value" id="water_mix">--</div>
@@ -353,12 +353,12 @@
   <div class="cell"><img src="images/256_pump.png"></div>
 
   <!-- Row 3 -->
-  <div class="cell"><img src="images/256_arrow_red_90.png" style="transform: rotate(90deg);"></div>
-  <div class="cell"><img src="images/256_arrow_red_90.png" style="transform: rotate(90deg);"></div>
-  <div class="cell"><img src="images/256_arrow_red.png"></div>
+  <div class="cell"><img id="arrow_3_0" src="images/256_arrow_red_90.png" style="transform: rotate(90deg);"></div>
+  <div class="cell"><img id="arrow_3_1" src="images/256_arrow_red_90.png" style="transform: rotate(90deg);"></div>
+  <div class="cell"><img id="arrow_3_2" src="images/256_arrow_red.png"></div>
   <div class="cell"><img src="images/256_radiator.png"></div>
-  <div class="cell"><img src="images/256_arrow_blue.png"></div>
-  <div class="cell"><img src="images/256_arrow_blue_90.png" style="transform: rotate(90deg);"></div>
+  <div class="cell"><img id="arrow_3_4" src="images/256_arrow_blue.png"></div>
+  <div class="cell"><img id="arrow_3_5" src="images/256_arrow_blue_90.png" style="transform: rotate(90deg);"></div>
 
   <!-- Row 4 -->
   <div class="cell"></div>
@@ -498,6 +498,183 @@ function connectWebSocket() {
   };
 }
 
+// Helper function to determine arrow color based on temperature
+function getArrowColor(temperature) {
+  if (temperature === null || temperature === undefined) {
+    return 'blue'; // Default to blue if no temp available
+  }
+  
+  if (temperature > 120) {
+    return 'red';
+  } else if (temperature >= 70) {
+    return 'orange';
+  } else {
+    return 'blue';
+  }
+}
+
+// Update arrow colors based on current temperatures
+function updateArrowColors(data) {
+  const temps = data.temperatures;
+  if (!temps) return;
+  
+  // Get colors for each temperature zone
+  const hotColor = getArrowColor(temps.water_hot);
+  const mixColor = getArrowColor(temps.water_mix);
+  const coldColor = getArrowColor(temps.water_cold);
+  const reservoirColor = getArrowColor(temps.water_reservoir);
+  
+  // Water_hot controls: 0:2, 0:1, 0:0, 1:1, 1:0, 2:1
+  updateArrowImage('arrow_0_2', hotColor, '', 'rotate(180deg)');
+  updateArrowImage('arrow_0_1', hotColor, '_90', 'rotate(180deg)');
+  updateArrowImage('arrow_0_0', hotColor, '_90', 'rotate(180deg)');
+  updateArrowImage('arrow_1_1', hotColor, '', 'rotate(90deg)');
+  updateArrowImage('arrow_1_0', hotColor, '', 'rotate(90deg)');
+  updateArrowImage('arrow_2_1', hotColor, '', 'rotate(90deg)');
+  
+  // Water_mix controls: 3:2, 3:1, 3:0 (but 3:0 uses reservoir in mix mode)
+  updateArrowImage('arrow_3_2', mixColor, '', '');
+  updateArrowImage('arrow_3_1', mixColor, '_90', 'rotate(90deg)');
+  updateArrowImage('arrow_3_0', mixColor, '_90', 'rotate(90deg)');
+  
+  // Water_cold controls: 0:4, 0:5, 1:5, 3:4, 3:5
+  updateArrowImage('arrow_0_4', coldColor, '', 'rotate(180deg)');
+  updateArrowImage('arrow_0_5', coldColor, '_90', '');
+  updateArrowImage('arrow_1_5', coldColor, '', 'rotate(-90deg)');
+  updateArrowImage('arrow_3_4', coldColor, '', '');
+  updateArrowImage('arrow_3_5', coldColor, '_90', 'rotate(90deg)');
+  
+  console.log(`Arrow colors updated: hot=${hotColor}, mix=${mixColor}, cold=${coldColor}`);
+}
+
+// Helper to update an arrow image source
+function updateArrowImage(elementId, color, suffix, transform) {
+  const element = document.getElementById(elementId);
+  if (element) {
+    element.src = `images/256_arrow_${color}${suffix}.png`;
+    if (transform) {
+      element.style.transform = transform;
+    }
+  }
+}
+
+// Update arrow visibility and direction based on flow mode
+function updateArrowVisibility(flowMode, temps) {
+  if (!flowMode || !temps) return;
+  
+  const hotColor = getArrowColor(temps.water_hot);
+  const mixColor = getArrowColor(temps.water_mix);
+  const reservoirColor = getArrowColor(temps.water_reservoir);
+  
+  console.log(`Updating arrow visibility for flow mode: ${flowMode}`);
+  
+  // Get all arrow cells
+  const arrow_0_0 = document.getElementById('arrow_0_0');
+  const arrow_0_1 = document.getElementById('arrow_0_1');
+  const arrow_1_0 = document.getElementById('arrow_1_0');
+  const arrow_1_1 = document.getElementById('arrow_1_1');
+  const arrow_2_1 = document.getElementById('arrow_2_1');
+  const arrow_3_0 = document.getElementById('arrow_3_0');
+  const arrow_3_1 = document.getElementById('arrow_3_1');
+  
+  if (flowMode === 'main') {
+    // Main mode: main ON, diversion OFF
+    // Hide: 0:0, 1:0, 3:0 (hide the image only, not the cell)
+    if (arrow_0_0) arrow_0_0.style.visibility = 'hidden';
+    if (arrow_1_0) arrow_1_0.style.visibility = 'hidden';
+    if (arrow_3_0) arrow_3_0.style.visibility = 'hidden';
+    
+    // Show and configure visible arrows
+    if (arrow_0_1) {
+      arrow_0_1.style.visibility = 'visible';
+      updateArrowImage('arrow_0_1', hotColor, '_90', 'rotate(180deg)'); // 90° turn
+    }
+    if (arrow_1_1) {
+      arrow_1_1.style.visibility = 'visible';
+      updateArrowImage('arrow_1_1', hotColor, '', 'rotate(90deg)'); // Down arrow
+    }
+    if (arrow_2_1) {
+      arrow_2_1.style.visibility = 'visible';
+      updateArrowImage('arrow_2_1', hotColor, '', 'rotate(90deg)'); // Down arrow
+    }
+    if (arrow_3_1) {
+      arrow_3_1.style.visibility = 'visible';
+      updateArrowImage('arrow_3_1', mixColor, '_90', 'rotate(90deg)'); // 90° turn
+    }
+    
+  } else if (flowMode === 'diversion') {
+    // Diversion mode: main OFF, diversion ON
+    // Hide: 1:1, 2:1 (hide the image only, not the cell)
+    if (arrow_1_1) arrow_1_1.style.visibility = 'hidden';
+    if (arrow_2_1) arrow_2_1.style.visibility = 'hidden';
+    
+    // Show and configure others with special directions
+    if (arrow_0_1) {
+      arrow_0_1.style.visibility = 'visible';
+      updateArrowImage('arrow_0_1', hotColor, '', 'rotate(0deg)'); // Pointing LEFT
+    }
+    if (arrow_1_0) {
+      arrow_1_0.style.visibility = 'visible';
+      updateArrowImage('arrow_1_0', hotColor, '', 'rotate(90deg)'); // Pointing DOWN
+    }
+    if (arrow_3_0) {
+      arrow_3_0.style.visibility = 'visible';
+      updateArrowImage('arrow_3_0', mixColor, '_90', 'rotate(90deg)'); // 90° arrow
+    }
+    if (arrow_3_1) {
+      arrow_3_1.style.visibility = 'visible';
+      updateArrowImage('arrow_3_1', mixColor, '', 'rotate(0deg)'); // Straight arrow pointing RIGHT
+    }
+    if (arrow_0_0) {
+      arrow_0_0.style.visibility = 'visible';
+      updateArrowImage('arrow_0_0', hotColor, '_90', 'rotate(180deg)');
+    }
+    
+  } else if (flowMode === 'mix') {
+    // Mix mode: main ON, diversion ON
+    // Show all arrows, with branching arrows at 0:1 and 3:1
+    if (arrow_0_0) {
+      arrow_0_0.style.visibility = 'visible';
+      updateArrowImage('arrow_0_0', hotColor, '_90', 'rotate(180deg)');
+    }
+    if (arrow_0_1) {
+      arrow_0_1.style.visibility = 'visible';
+      updateArrowImage('arrow_0_1', hotColor, '_branch', 'rotate(180deg)'); // BRANCHING arrow
+    }
+    if (arrow_1_0) {
+      arrow_1_0.style.visibility = 'visible';
+      updateArrowImage('arrow_1_0', hotColor, '', 'rotate(90deg)'); // DOWN arrow
+    }
+    if (arrow_1_1) {
+      arrow_1_1.style.visibility = 'visible';
+      updateArrowImage('arrow_1_1', hotColor, '', 'rotate(90deg)'); // DOWN arrow
+    }
+    if (arrow_2_1) {
+      arrow_2_1.style.visibility = 'visible';
+      updateArrowImage('arrow_2_1', hotColor, '', 'rotate(90deg)'); // DOWN arrow
+    }
+    if (arrow_3_0) {
+      arrow_3_0.style.visibility = 'visible';
+      updateArrowImage('arrow_3_0', reservoirColor, '_90', 'rotate(90deg)'); // Uses water_reservoir color
+    }
+    if (arrow_3_1) {
+      arrow_3_1.style.visibility = 'visible';
+      updateArrowImage('arrow_3_1', mixColor, '_branch', 'rotate(90deg)'); // BRANCHING arrow
+    }
+    
+  } else {
+    // 'none' or unknown mode - show all arrows with default colors
+    console.warn(`Unknown flow mode: ${flowMode}, showing all arrows with default colors`);
+    if (arrow_0_0) arrow_0_0.style.visibility = 'visible';
+    if (arrow_0_1) arrow_0_1.style.visibility = 'visible';
+    if (arrow_1_0) arrow_1_0.style.visibility = 'visible';
+    if (arrow_1_1) arrow_1_1.style.visibility = 'visible';
+    if (arrow_2_1) arrow_2_1.style.visibility = 'visible';
+    if (arrow_3_0) arrow_3_0.style.visibility = 'visible';
+    if (arrow_3_1) arrow_3_1.style.visibility = 'visible';
+  }
+}
+
 function updateDisplay(data) {
   console.log('updateDisplay called with:', data);
   
@@ -514,6 +691,14 @@ function updateDisplay(data) {
   updateValue('water_cold', temps.water_cold, '°F');
   updateValue('air_cool', temps.air_cool, '°F');
   updateValue('air_heated', temps.air_heated, '°F');
+  
+  // Update arrow colors based on temperatures
+  updateArrowColors(data);
+  
+  // Update arrow visibility and direction based on flow mode
+  if (data.flow_mode) {
+    updateArrowVisibility(data.flow_mode, temps);
+  }
   
   // Update deltas
   const deltas = data.deltas;
