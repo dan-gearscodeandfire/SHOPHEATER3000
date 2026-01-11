@@ -715,12 +715,12 @@ function updateDisplay(data) {
   
   // Update temperatures (always update sensor displays) with dynamic colors
   const temps = data.temperatures;
-  updateTemperatureValue('water_hot', temps.water_hot, '°F');
-  updateTemperatureValue('water_reservoir', temps.water_reservoir, '°F');
-  updateTemperatureValue('water_mix', temps.water_mix, '°F');
-  updateTemperatureValue('water_cold', temps.water_cold, '°F');
-  updateTemperatureValue('air_cool', temps.air_cool, '°F');
-  updateTemperatureValue('air_heated', temps.air_heated, '°F');
+  updateTemperatureValue('water_hot', temps.water_hot, '°');
+  updateTemperatureValue('water_reservoir', temps.water_reservoir, '°');
+  updateTemperatureValue('water_mix', temps.water_mix, '°');
+  updateTemperatureValue('water_cold', temps.water_cold, '°');
+  updateTemperatureValue('air_cool', temps.air_cool, '°');
+  updateTemperatureValue('air_heated', temps.air_heated, '°');
   
   // Update arrow visibility and direction based on flow mode FIRST
   // (This sets type, color, and rotation for dynamic arrows)
@@ -734,12 +734,12 @@ function updateDisplay(data) {
   
   // Update deltas
   const deltas = data.deltas;
-  updateValue('delta_water_heater', deltas.delta_water_heater, '°F');
-  updateValue('delta_water_radiator', deltas.delta_water_radiator, '°F');
-  updateValue('delta_air', deltas.delta_air, '°F');
+  updateValue('delta_water_heater', deltas.delta_water_heater, '°');
+  updateValue('delta_water_radiator', deltas.delta_water_radiator, '°');
+  updateValue('delta_air', deltas.delta_air, '°');
   
   // Update flow rate
-  updateValue('flow_rate', data.flow_rate, ' L/min');
+  updateValue('flow_rate', data.flow_rate, '');
   
   // Update fan speed display
   updateValue('fan_speed_display', data.fan_speed, '%');
