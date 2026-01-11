@@ -581,7 +581,172 @@ element.addEventListener('mousedown', () => {
 
 ---
 
-**Last Updated:** January 11, 2026 06:00 UTC  
+---
+
+## Problem 16: Dynamic Arrow Rotation and Color Display Issues
+
+**Module:** Web UI (web_ui.html)  
+**Date:** January 11, 2026  
+**Symptom:** Arrow icons not rotating correctly based on flow mode, despite code appearing correct
+- Arrows would display with wrong orientations in different flow modes
+- Color changes based on temperature worked initially, but then stopped
+- Rotations seemed to be reset or overwritten unexpectedly
+- Different arrow types (straight, 90°, branch) needed to be swapped dynamically
+
+**Background:**
+Implemented dynamic water flow visualization system:
+- **Color coding:** Arrows change color based on temperature (RED >120°F, ORANGE 70-120°F, BLUE <70°F)
+- **Flow mode visualization:** Arrow types and orientations change based on solenoid states
+  - MAIN mode (main ON, diversion OFF)
+  - DIVERSION mode (main OFF, diversion ON)
+  - MIX mode (main ON, diversion ON) - uses branching arrows
+- Specific cells (0:0, 0:1, 1:0, 1:1, 2:1, 3:0, 3:1) change arrow type and rotation dynamically
+- Static arrows only change color
+
+**Root Cause:** Function responsibility overlap and execution order
+1. `updateArrowColors()` was resetting rotations when updating colors
+2. Called BEFORE `updateArrowVisibility()`, so visibility function's rotations were immediately overwritten
+3. `updateArrowColors()` was touching dynamic arrows that should be managed entirely by `updateArrowVisibility()`
+4. Even though code was correct, browser cache prevented latest JavaScript from loading
+
+**Investigation Process:**
+1. **Initial approach:** Tried to adjust rotation values, but changes didn't persist
+2. **Debug logging:** Added console.log to see what transforms were being applied
+3. **DOM inspection:** Used browser evaluate to check actual element properties
+4. **Execution order:** Discovered `updateArrowColors()` ran before `updateArrowVisibility()`
+5. **Function analysis:** Found `updateArrowColors()` was setting both `src` AND `transform`
+6. **Browser cache:** Discovered F5 refresh wasn't loading updated code (needed Ctrl+Shift+R)
+
+**Solution (Multi-Part):**
+
+**Part 1: Function Responsibility Separation**
+```javascript
+// BEFORE: updateArrowColors touched all arrows
+function updateArrowColors(data) {
+  updateArrowImage('arrow_0_1', hotColor, '_90', 'rotate(90deg)'); // ❌ Setting rotation
+}
+
+// AFTER: updateArrowColors only handles static arrows
+function updateArrowColors(data) {
+  updateArrowColorOnly('arrow_0_2', hotColor, ''); // ✅ Color only
+  // Dynamic arrows (0:0, 0:1, etc.) skipped - handled by updateArrowVisibility()
+}
+```
+
+**Part 2: Created Color-Only Helper**
+```javascript
+// New helper - NEVER touches transform property
+function updateArrowColorOnly(elementId, color, suffix) {
+  const element = document.getElementById(elementId);
+  if (element) {
+    element.src = `images/256_arrow_${color}${suffix}.png`;
+    // Do NOT touch transform - that's handled by updateArrowVisibility()
+  }
+}
+```
+
+**Part 3: Execution Order Fix**
+```javascript
+// BEFORE:
+updateArrowColors(data);          // ❌ Overwrites rotations
+updateArrowVisibility(flowMode);  // Sets rotations (too late)
+
+// AFTER:
+updateArrowVisibility(flowMode);  // ✅ Sets type, color, AND rotation first
+updateArrowColors(data);          // Only updates static arrow colors
+```
+
+**Part 4: User-Directed Rotation Corrections**
+Applied cumulative rotation adjustments based on real hardware testing:
+- **MAIN mode:** 0:1 needs +180°, 3:1 needs +90°
+- **DIVERSION mode:** 0:0 needs +90°, 3:0 needs +90°, 3:1 needs +90°
+- **MIX mode:** 0:0 needs +90°, 0:1 needs +180°, 3:0 needs +90°, 3:1 needs +90°
+
+Final rotation values (examples):
+```javascript
+// MAIN mode
+updateArrowImage('arrow_0_1', hotColor, '_90', 'rotate(270deg)'); // 90° + 180°
+updateArrowImage('arrow_3_1', mixColor, '_90', 'rotate(180deg)'); // 90° + 90°
+
+// MIX mode  
+updateArrowImage('arrow_0_0', hotColor, '_90', 'rotate(270deg)');   // 180° + 90°
+updateArrowImage('arrow_0_1', hotColor, '_branch', 'rotate(0deg)'); // 180° + 180° = 360° = 0°
+updateArrowImage('arrow_3_0', reservoirColor, '_90', 'rotate(180deg)'); // 90° + 90°
+updateArrowImage('arrow_3_1', mixColor, '_branch', 'rotate(180deg)');   // 90° + 90°
+
+// DIVERSION mode
+updateArrowImage('arrow_0_0', hotColor, '_90', 'rotate(270deg)'); // 180° + 90°
+updateArrowImage('arrow_3_0', mixColor, '_90', 'rotate(180deg)'); // 90° + 90°
+updateArrowImage('arrow_3_1', mixColor, '', 'rotate(0deg)');      // -90° + 90° = 0°
+```
+
+**Part 5: Layout Preservation**
+```javascript
+// BEFORE: Using display: none
+arrow.parentElement.style.display = 'none'; // ❌ Breaks CSS grid layout
+
+// AFTER: Using visibility: hidden
+arrow.style.visibility = 'hidden'; // ✅ Hides image, preserves grid cell
+```
+
+**Testing Method:**
+Created automated browser-based testing:
+```javascript
+// Inject fake temperature data to test color changes
+const testData = {
+  temperatures: {
+    water_hot: 130,   // RED (>120°F)
+    water_mix: 95,    // ORANGE (70-120°F)
+    water_cold: 50,   // BLUE (<70°F)
+  },
+  flow_mode: 'mix'
+};
+updateDisplay(testData);
+```
+
+**Results:**
+- ✅ Arrow colors change correctly: RED >120°F, ORANGE 70-120°F, BLUE <70°F
+- ✅ Arrow types change correctly: straight/_90/_branch based on flow mode
+- ✅ Arrow rotations correct in all three flow modes
+- ✅ Grid layout preserved (no cell movement)
+- ✅ Automated testing verified color thresholds
+- ✅ Visual flow representation matches physical water flow
+
+**Code Architecture:**
+```
+updateDisplay(data)
+  ├─ updateArrowVisibility(flowMode, temps)  [FIRST]
+  │    ├─ Sets arrow type (straight/_90/_branch)
+  │    ├─ Sets arrow color (for dynamic arrows)
+  │    ├─ Sets arrow rotation (CSS transform)
+  │    └─ Sets visibility (show/hide based on mode)
+  │
+  └─ updateArrowColors(data)                 [SECOND]
+       └─ Updates ONLY static arrow colors
+           (preserves rotations set above)
+```
+
+**Key Learnings:**
+1. **Separation of concerns:** One function should own each property (color vs rotation)
+2. **Execution order matters:** Set structure first, then update details
+3. **Dynamic vs static distinction:** Treat mode-dependent elements separately from constants
+4. **Browser cache gotcha:** Hard refresh (Ctrl+Shift+R) needed to load updated JavaScript
+5. **Visual testing:** Fake data injection allows rapid UI testing without hardware
+6. **Base orientation matters:** Need to understand default image orientation to calculate rotations
+7. **Cumulative testing:** Iterative user feedback more reliable than theoretical calculations
+
+**Creative Achievement:**
+The arrow visualization system provides instant visual feedback:
+- Temperature at a glance (color coding)
+- Flow path visibility (mode-based routing)
+- System state comprehension (no need to parse numbers)
+- Professional dashboard appearance
+
+**Status:** ✅ Solved - Dynamic flow visualization working perfectly
+
+---
+
+**Last Updated:** January 11, 2026 22:00 UTC  
 **System:** Raspberry Pi 4, Kernel 6.12.47+rpt-rpi-v8  
 **Status:** All known problems solved  
-**Total Problems Documented:** 15 (14 solved, 1 informational warning)
+**Total Problems Documented:** 16 (15 solved, 1 informational warning)
