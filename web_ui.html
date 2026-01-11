@@ -59,11 +59,24 @@
   }
 
   .temp-value {
-    color: #ff8844;
+    font-size: 28px;
+    font-weight: bold;
+    line-height: 1.2;
+    /* Color will be set dynamically based on temperature */
   }
 
   .delta-value {
+    font-size: 28px;
+    font-weight: bold;
+    line-height: 1.2;
     color: #44ff88;
+  }
+
+  .flow-value {
+    font-size: 28px;
+    font-weight: bold;
+    line-height: 1.2;
+    color: #4CAF50;
   }
 
   .flow-value {
@@ -513,6 +526,21 @@ function getArrowColor(temperature) {
   }
 }
 
+// Get CSS color for temperature display text (matches arrow colors)
+function getTemperatureColor(temperature) {
+  if (temperature === null || temperature === undefined) {
+    return '#3399FF'; // Blue - default
+  }
+  
+  if (temperature > 120) {
+    return '#FF3333'; // Red - hot
+  } else if (temperature >= 70) {
+    return '#FF8800'; // Orange - warm
+  } else {
+    return '#3399FF'; // Blue - cold
+  }
+}
+
 // Update arrow colors for STATIC arrows only (never change type/rotation)
 // Dynamic arrows (0:0, 0:1, 1:0, 1:1, 2:1, 3:0, 3:1) are handled entirely by updateArrowVisibility()
 function updateArrowColors(data) {
@@ -685,14 +713,14 @@ function updateDisplay(data) {
     switchMode(data.control_mode);
   }
   
-  // Update temperatures (always update sensor displays)
+  // Update temperatures (always update sensor displays) with dynamic colors
   const temps = data.temperatures;
-  updateValue('water_hot', temps.water_hot, '°F');
-  updateValue('water_reservoir', temps.water_reservoir, '°F');
-  updateValue('water_mix', temps.water_mix, '°F');
-  updateValue('water_cold', temps.water_cold, '°F');
-  updateValue('air_cool', temps.air_cool, '°F');
-  updateValue('air_heated', temps.air_heated, '°F');
+  updateTemperatureValue('water_hot', temps.water_hot, '°F');
+  updateTemperatureValue('water_reservoir', temps.water_reservoir, '°F');
+  updateTemperatureValue('water_mix', temps.water_mix, '°F');
+  updateTemperatureValue('water_cold', temps.water_cold, '°F');
+  updateTemperatureValue('air_cool', temps.air_cool, '°F');
+  updateTemperatureValue('air_heated', temps.air_heated, '°F');
   
   // Update arrow visibility and direction based on flow mode FIRST
   // (This sets type, color, and rotation for dynamic arrows)
@@ -755,6 +783,21 @@ function updateDisplay(data) {
     if (document.activeElement !== fanSpeedInput && document.activeElement !== fanSpeedSlider) {
       fanSpeedInput.value = data.fan_speed;
       fanSpeedSlider.value = data.fan_speed;
+    }
+  }
+}
+
+// Update temperature value with dynamic color based on temperature
+function updateTemperatureValue(elementId, value, unit = '') {
+  const element = document.getElementById(elementId);
+  if (element) {
+    if (value !== null && value !== undefined) {
+      element.textContent = value + unit;
+      // Apply dynamic color based on temperature thresholds
+      element.style.color = getTemperatureColor(value);
+    } else {
+      element.textContent = '--';
+      element.style.color = '#888'; // Gray for no data
     }
   }
 }
