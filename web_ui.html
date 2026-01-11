@@ -209,6 +209,93 @@
     display: flex;
     align-items: center;
   }
+
+  .mode-selector {
+    background: #333;
+    padding: 15px 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border: 2px solid #555;
+  }
+
+  .mode-selector.manual {
+    border-color: #4CAF50;
+    background: #1a3a1a;
+  }
+
+  .mode-selector.automatic {
+    border-color: #FFA500;
+    background: #3a2a1a;
+  }
+
+  .mode-label {
+    font-size: 16px;
+    font-weight: bold;
+    color: #fff;
+  }
+
+  .mode-badge {
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-weight: bold;
+    font-size: 14px;
+  }
+
+  .mode-badge.manual {
+    background: #4CAF50;
+    color: #fff;
+  }
+
+  .mode-badge.automatic {
+    background: #FFA500;
+    color: #000;
+  }
+
+  .controls.disabled {
+    opacity: 0.6;
+    pointer-events: none;
+  }
+
+  .automation-notice {
+    background: #3a2a1a;
+    border: 1px solid #FFA500;
+    padding: 10px;
+    border-radius: 4px;
+    margin-bottom: 15px;
+    color: #FFA500;
+    text-align: center;
+    font-size: 14px;
+    display: none;
+  }
+
+  .automation-notice.visible {
+    display: block;
+  }
+
+  /* Disabled control styling for automatic mode */
+  .toggle input:disabled + .slider {
+    background-color: #444;
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  .toggle input:disabled:checked + .slider {
+    background-color: #666;
+  }
+
+  input[type="number"]:disabled,
+  input[type="range"]:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  input[type="range"]:disabled::-webkit-slider-thumb {
+    background: #666;
+    cursor: not-allowed;
+  }
 </style>
 </head>
 
@@ -296,8 +383,24 @@
 </div>
 
 <!-- Control Panel -->
-<div class="controls">
+<div class="controls" id="controlsPanel">
   <h3 style="margin-top:0; color:#fff;">Controls</h3>
+  
+  <!-- Mode Selector -->
+  <div class="mode-selector" id="modeSelector">
+    <div class="mode-label">Control Mode:</div>
+    <div style="display: flex; gap: 10px; align-items: center;">
+      <span class="mode-badge" id="modeBadge">MANUAL</span>
+      <label class="toggle">
+        <input type="checkbox" id="modeToggle">
+        <span class="slider"></span>
+      </label>
+    </div>
+  </div>
+  
+  <div class="automation-notice" id="automationNotice">
+    System is running automated logic - controls are read-only
+  </div>
   
   <div class="control-group">
     <label>Main Loop Solenoid</label>
@@ -336,6 +439,16 @@
 // WebSocket connection
 let ws = null;
 let reconnectInterval = null;
+
+// Control mode state
+let currentMode = 'manual';
+
+// Ignore windows for manual mode (timestamps when to stop ignoring)
+const ignoreWindows = {
+  main_loop: 0,
+  diversion: 0,
+  fan_speed: 0
+};
 
 function connectWebSocket() {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -380,7 +493,13 @@ function connectWebSocket() {
 
 function updateDisplay(data) {
   console.log('updateDisplay called with:', data);
-  // Update temperatures
+  
+  // Update mode if changed
+  if (data.control_mode && data.control_mode !== currentMode) {
+    switchMode(data.control_mode);
+  }
+  
+  // Update temperatures (always update sensor displays)
   const temps = data.temperatures;
   updateValue('water_hot', temps.water_hot, '°F');
   updateValue('water_reservoir', temps.water_reservoir, '°F');
@@ -401,26 +520,34 @@ function updateDisplay(data) {
   // Update fan speed display
   updateValue('fan_speed_display', data.fan_speed, '%');
   
-  // Update control states (without triggering change events)
+  // Update control states based on mode
   const mainLoopToggle = document.getElementById('mainLoopToggle');
   const diversionToggle = document.getElementById('diversionToggle');
   const fanSpeedInput = document.getElementById('fanSpeedInput');
   const fanSpeedSlider = document.getElementById('fanSpeedSlider');
   
-  if (mainLoopToggle.checked !== data.main_loop_state) {
-    mainLoopToggle.checked = data.main_loop_state;
-    document.getElementById('mainLoopLabel').textContent = data.main_loop_state ? 'ON' : 'OFF';
+  // Main loop toggle - update if not ignoring
+  if (!shouldIgnoreUpdate('main_loop')) {
+    if (mainLoopToggle.checked !== data.main_loop_state) {
+      mainLoopToggle.checked = data.main_loop_state;
+      document.getElementById('mainLoopLabel').textContent = data.main_loop_state ? 'ON' : 'OFF';
+    }
   }
   
-  if (diversionToggle.checked !== data.diversion_state) {
-    diversionToggle.checked = data.diversion_state;
-    document.getElementById('diversionLabel').textContent = data.diversion_state ? 'ON' : 'OFF';
+  // Diversion toggle - update if not ignoring
+  if (!shouldIgnoreUpdate('diversion')) {
+    if (diversionToggle.checked !== data.diversion_state) {
+      diversionToggle.checked = data.diversion_state;
+      document.getElementById('diversionLabel').textContent = data.diversion_state ? 'ON' : 'OFF';
+    }
   }
   
-  // Only update fan controls if they don't have focus (user isn't actively changing them)
-  if (document.activeElement !== fanSpeedInput && document.activeElement !== fanSpeedSlider) {
-    fanSpeedInput.value = data.fan_speed;
-    fanSpeedSlider.value = data.fan_speed;
+  // Fan controls - update if not ignoring and not focused
+  if (!shouldIgnoreUpdate('fan_speed')) {
+    if (document.activeElement !== fanSpeedInput && document.activeElement !== fanSpeedSlider) {
+      fanSpeedInput.value = data.fan_speed;
+      fanSpeedSlider.value = data.fan_speed;
+    }
   }
 }
 
@@ -439,6 +566,68 @@ function updateValue(elementId, value, unit = '') {
   }
 }
 
+function shouldIgnoreUpdate(controlName) {
+  // In automatic mode, never ignore updates
+  if (currentMode === 'automatic') return false;
+  
+  // In manual mode, check if we're within the ignore window
+  return Date.now() < ignoreWindows[controlName];
+}
+
+function setIgnoreWindow(controlName, durationMs = 1000) {
+  ignoreWindows[controlName] = Date.now() + durationMs;
+  console.log(`Set ignore window for ${controlName} for ${durationMs}ms`);
+}
+
+function switchMode(mode) {
+  currentMode = mode;
+  console.log(`Switched to ${mode} mode`);
+  
+  const modeSelector = document.getElementById('modeSelector');
+  const modeBadge = document.getElementById('modeBadge');
+  const modeToggle = document.getElementById('modeToggle');
+  const controlsPanel = document.getElementById('controlsPanel');
+  const automationNotice = document.getElementById('automationNotice');
+  
+  // Update toggle state without triggering event
+  modeToggle.checked = (mode === 'automatic');
+  
+  if (mode === 'automatic') {
+    // Automatic mode
+    modeSelector.className = 'mode-selector automatic';
+    modeBadge.className = 'mode-badge automatic';
+    modeBadge.textContent = 'AUTOMATIC';
+    
+    // Disable controls
+    document.getElementById('mainLoopToggle').disabled = true;
+    document.getElementById('diversionToggle').disabled = true;
+    document.getElementById('fanSpeedInput').disabled = true;
+    document.getElementById('fanSpeedSlider').disabled = true;
+    
+    // Show automation notice
+    automationNotice.className = 'automation-notice visible';
+    
+    // Clear all ignore windows
+    ignoreWindows.main_loop = 0;
+    ignoreWindows.diversion = 0;
+    ignoreWindows.fan_speed = 0;
+  } else {
+    // Manual mode
+    modeSelector.className = 'mode-selector manual';
+    modeBadge.className = 'mode-badge manual';
+    modeBadge.textContent = 'MANUAL';
+    
+    // Enable controls
+    document.getElementById('mainLoopToggle').disabled = false;
+    document.getElementById('diversionToggle').disabled = false;
+    document.getElementById('fanSpeedInput').disabled = false;
+    document.getElementById('fanSpeedSlider').disabled = false;
+    
+    // Hide automation notice
+    automationNotice.className = 'automation-notice';
+  }
+}
+
 function sendCommand(command) {
   console.log('Sending command:', command);
   if (ws && ws.readyState === WebSocket.OPEN) {
@@ -452,13 +641,21 @@ function sendCommand(command) {
 // Control event listeners
 document.getElementById('mainLoopToggle').addEventListener('change', (e) => {
   const state = e.target.checked;
+  // Optimistic UI update
   document.getElementById('mainLoopLabel').textContent = state ? 'ON' : 'OFF';
+  // Set ignore window for manual mode
+  setIgnoreWindow('main_loop', 1000);
+  // Send command to server
   sendCommand({ main_loop: state });
 });
 
 document.getElementById('diversionToggle').addEventListener('change', (e) => {
   const state = e.target.checked;
+  // Optimistic UI update
   document.getElementById('diversionLabel').textContent = state ? 'ON' : 'OFF';
+  // Set ignore window for manual mode
+  setIgnoreWindow('diversion', 1000);
+  // Send command to server
   sendCommand({ diversion: state });
 });
 
@@ -467,13 +664,24 @@ document.getElementById('fanSpeedInput').addEventListener('input', (e) => {
   const value = parseInt(e.target.value) || 0;
   const clamped = Math.max(0, Math.min(100, value));
   document.getElementById('fanSpeedSlider').value = clamped;
+  // Set ignore window for manual mode
+  setIgnoreWindow('fan_speed', 1000);
   sendCommand({ fan_speed: clamped });
 });
 
 document.getElementById('fanSpeedSlider').addEventListener('input', (e) => {
   const value = parseInt(e.target.value);
   document.getElementById('fanSpeedInput').value = value;
+  // Set ignore window for manual mode
+  setIgnoreWindow('fan_speed', 1000);
   sendCommand({ fan_speed: value });
+});
+
+// Mode toggle event listener
+document.getElementById('modeToggle').addEventListener('change', (e) => {
+  const newMode = e.target.checked ? 'automatic' : 'manual';
+  sendCommand({ control_mode: newMode });
+  // Mode will be updated when server confirms via WebSocket
 });
 
 // Connect on page load

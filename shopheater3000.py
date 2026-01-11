@@ -52,6 +52,7 @@ class ShopHeaterController:
         self.current_fan_speed = 0
         self.main_loop_state = False  # False=off (HIGH), True=on (LOW)
         self.diversion_state = False  # False=off (HIGH), True=on (LOW)
+        self.control_mode = 'manual'  # 'manual' or 'automatic'
         
         # Set initial safe state
         self.valve_control.all_closed()
@@ -141,7 +142,8 @@ class ShopHeaterController:
             'flow_rate': flow_rate,
             'fan_speed': self.current_fan_speed,
             'main_loop_state': self.main_loop_state,
-            'diversion_state': self.diversion_state
+            'diversion_state': self.diversion_state,
+            'control_mode': self.control_mode
         }
         
         return data
@@ -178,6 +180,18 @@ class ShopHeaterController:
             self.valve_control.diversion_high()  # Turn off
         self.diversion_state = state
         print(f"Diversion: {'ON' if state else 'OFF'}")
+    
+    def set_control_mode(self, mode: str):
+        """
+        Set control mode.
+        'manual' = user control via web UI
+        'automatic' = automated control logic
+        """
+        if mode in ['manual', 'automatic']:
+            self.control_mode = mode
+            print(f"Control mode set to: {mode.upper()}")
+        else:
+            print(f"Invalid control mode: {mode}. Must be 'manual' or 'automatic'.")
     
     def cleanup(self):
         """Clean up all hardware resources."""
@@ -298,6 +312,9 @@ async def websocket_endpoint(websocket: WebSocket):
                 
                 if 'diversion' in command:
                     controller.set_diversion(bool(command['diversion']))
+                
+                if 'control_mode' in command:
+                    controller.set_control_mode(str(command['control_mode']))
                 
                 # Immediately send updated state back to client after command
                 updated_data = controller.read_sensor_data()
