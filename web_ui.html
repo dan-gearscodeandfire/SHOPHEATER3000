@@ -513,7 +513,8 @@ function getArrowColor(temperature) {
   }
 }
 
-// Update arrow colors based on current temperatures
+// Update arrow colors for STATIC arrows only (never change type/rotation)
+// Dynamic arrows (0:0, 0:1, 1:0, 1:1, 2:1, 3:0, 3:1) are handled entirely by updateArrowVisibility()
 function updateArrowColors(data) {
   const temps = data.temperatures;
   if (!temps) return;
@@ -522,37 +523,38 @@ function updateArrowColors(data) {
   const hotColor = getArrowColor(temps.water_hot);
   const mixColor = getArrowColor(temps.water_mix);
   const coldColor = getArrowColor(temps.water_cold);
-  const reservoirColor = getArrowColor(temps.water_reservoir);
   
-  // Water_hot controls: 0:2, 0:1, 0:0, 1:1, 1:0, 2:1
-  updateArrowImage('arrow_0_2', hotColor, '', 'rotate(180deg)');
-  updateArrowImage('arrow_0_1', hotColor, '_90', 'rotate(180deg)');
-  updateArrowImage('arrow_0_0', hotColor, '_90', 'rotate(180deg)');
-  updateArrowImage('arrow_1_1', hotColor, '', 'rotate(90deg)');
-  updateArrowImage('arrow_1_0', hotColor, '', 'rotate(90deg)');
-  updateArrowImage('arrow_2_1', hotColor, '', 'rotate(90deg)');
+  // Water_hot: ONLY arrow 0:2 (always straight, always rotate(180deg))
+  updateArrowColorOnly('arrow_0_2', hotColor, '');
   
-  // Water_mix controls: 3:2, 3:1, 3:0 (but 3:0 uses reservoir in mix mode)
-  updateArrowImage('arrow_3_2', mixColor, '', '');
-  updateArrowImage('arrow_3_1', mixColor, '_90', 'rotate(90deg)');
-  updateArrowImage('arrow_3_0', mixColor, '_90', 'rotate(90deg)');
+  // Water_mix: ONLY arrow 3:2 (always straight, always no rotation)
+  updateArrowColorOnly('arrow_3_2', mixColor, '');
   
-  // Water_cold controls: 0:4, 0:5, 1:5, 3:4, 3:5
-  updateArrowImage('arrow_0_4', coldColor, '', 'rotate(180deg)');
-  updateArrowImage('arrow_0_5', coldColor, '_90', '');
-  updateArrowImage('arrow_1_5', coldColor, '', 'rotate(-90deg)');
-  updateArrowImage('arrow_3_4', coldColor, '', '');
-  updateArrowImage('arrow_3_5', coldColor, '_90', 'rotate(90deg)');
+  // Water_cold arrows - all static
+  updateArrowColorOnly('arrow_0_4', coldColor, '');
+  updateArrowColorOnly('arrow_0_5', coldColor, '_90');
+  updateArrowColorOnly('arrow_1_5', coldColor, '');
+  updateArrowColorOnly('arrow_3_4', coldColor, '');
+  updateArrowColorOnly('arrow_3_5', coldColor, '_90');
   
   console.log(`Arrow colors updated: hot=${hotColor}, mix=${mixColor}, cold=${coldColor}`);
 }
 
-// Helper to update an arrow image source
+// Helper to update ONLY the arrow color, preserving rotation
+function updateArrowColorOnly(elementId, color, suffix) {
+  const element = document.getElementById(elementId);
+  if (element) {
+    element.src = `images/256_arrow_${color}${suffix}.png`;
+    // Do NOT touch transform - that's handled by updateArrowVisibility()
+  }
+}
+
+// Helper to update an arrow image source AND rotation
 function updateArrowImage(elementId, color, suffix, transform) {
   const element = document.getElementById(elementId);
   if (element) {
     element.src = `images/256_arrow_${color}${suffix}.png`;
-    if (transform) {
+    if (transform !== undefined) {
       element.style.transform = transform;
     }
   }
@@ -587,7 +589,7 @@ function updateArrowVisibility(flowMode, temps) {
     // Show and configure visible arrows
     if (arrow_0_1) {
       arrow_0_1.style.visibility = 'visible';
-      updateArrowImage('arrow_0_1', hotColor, '_90', 'rotate(180deg)'); // 90° turn
+      updateArrowImage('arrow_0_1', hotColor, '_90', 'rotate(90deg)'); // 90° CW
     }
     if (arrow_1_1) {
       arrow_1_1.style.visibility = 'visible';
@@ -599,7 +601,7 @@ function updateArrowVisibility(flowMode, temps) {
     }
     if (arrow_3_1) {
       arrow_3_1.style.visibility = 'visible';
-      updateArrowImage('arrow_3_1', mixColor, '_90', 'rotate(90deg)'); // 90° turn
+      updateArrowImage('arrow_3_1', mixColor, '_90', 'rotate(90deg)'); // 90° CW
     }
     
   } else if (flowMode === 'diversion') {
@@ -611,7 +613,7 @@ function updateArrowVisibility(flowMode, temps) {
     // Show and configure others with special directions
     if (arrow_0_1) {
       arrow_0_1.style.visibility = 'visible';
-      updateArrowImage('arrow_0_1', hotColor, '', 'rotate(0deg)'); // Pointing LEFT
+      updateArrowImage('arrow_0_1', hotColor, '', 'rotate(180deg)'); // 180° rotation
     }
     if (arrow_1_0) {
       arrow_1_0.style.visibility = 'visible';
@@ -619,15 +621,15 @@ function updateArrowVisibility(flowMode, temps) {
     }
     if (arrow_3_0) {
       arrow_3_0.style.visibility = 'visible';
-      updateArrowImage('arrow_3_0', mixColor, '_90', 'rotate(90deg)'); // 90° arrow
+      updateArrowImage('arrow_3_0', mixColor, '_90', 'rotate(90deg)'); // 90° CW
     }
     if (arrow_3_1) {
       arrow_3_1.style.visibility = 'visible';
-      updateArrowImage('arrow_3_1', mixColor, '', 'rotate(0deg)'); // Straight arrow pointing RIGHT
+      updateArrowImage('arrow_3_1', mixColor, '', 'rotate(-90deg)'); // 90° CCW
     }
     if (arrow_0_0) {
       arrow_0_0.style.visibility = 'visible';
-      updateArrowImage('arrow_0_0', hotColor, '_90', 'rotate(180deg)');
+      updateArrowImage('arrow_0_0', hotColor, '_90', 'rotate(180deg)'); // 180° CW
     }
     
   } else if (flowMode === 'mix') {
@@ -635,11 +637,11 @@ function updateArrowVisibility(flowMode, temps) {
     // Show all arrows, with branching arrows at 0:1 and 3:1
     if (arrow_0_0) {
       arrow_0_0.style.visibility = 'visible';
-      updateArrowImage('arrow_0_0', hotColor, '_90', 'rotate(180deg)');
+      updateArrowImage('arrow_0_0', hotColor, '_90', 'rotate(180deg)'); // 180° CW
     }
     if (arrow_0_1) {
       arrow_0_1.style.visibility = 'visible';
-      updateArrowImage('arrow_0_1', hotColor, '_branch', 'rotate(180deg)'); // BRANCHING arrow
+      updateArrowImage('arrow_0_1', hotColor, '_branch', 'rotate(180deg)'); // 180° CW (BRANCHING arrow)
     }
     if (arrow_1_0) {
       arrow_1_0.style.visibility = 'visible';
@@ -692,13 +694,15 @@ function updateDisplay(data) {
   updateValue('air_cool', temps.air_cool, '°F');
   updateValue('air_heated', temps.air_heated, '°F');
   
-  // Update arrow colors based on temperatures
-  updateArrowColors(data);
-  
-  // Update arrow visibility and direction based on flow mode
+  // Update arrow visibility and direction based on flow mode FIRST
+  // (This sets type, color, and rotation for dynamic arrows)
   if (data.flow_mode) {
     updateArrowVisibility(data.flow_mode, temps);
   }
+  
+  // Then update colors for static arrows
+  // (This only updates colors, not types or rotations)
+  updateArrowColors(data);
   
   // Update deltas
   const deltas = data.deltas;
