@@ -553,11 +553,9 @@ function updateArrowColorOnly(elementId, color, suffix) {
 function updateArrowImage(elementId, color, suffix, transform) {
   const element = document.getElementById(elementId);
   if (element) {
-    const newSrc = `images/256_arrow_${color}${suffix}.png`;
-    element.src = newSrc;
+    element.src = `images/256_arrow_${color}${suffix}.png`;
     if (transform !== undefined) {
       element.style.transform = transform;
-      console.log(`Set ${elementId}: src=${newSrc}, transform=${transform}`);
     }
   }
 }
