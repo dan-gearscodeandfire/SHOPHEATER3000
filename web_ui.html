@@ -721,9 +721,18 @@ document.getElementById('fanSpeedInput').addEventListener('input', (e) => {
 document.getElementById('fanSpeedInput').addEventListener('change', (e) => {
   const value = parseInt(e.target.value) || 0;
   const clamped = Math.max(0, Math.min(100, value));
-  // Set ignore window for manual mode
-  setIgnoreWindow('fan_speed', 1000);
+  // Set ignore window for manual mode (2s for consistency with toggles)
+  setIgnoreWindow('fan_speed', 2000);
+  setExpectedState('fan_speed', clamped);
   sendCommand({ fan_speed: clamped });
+});
+
+// Set ignore window when slider drag starts
+document.getElementById('fanSpeedSlider').addEventListener('mousedown', () => {
+  setIgnoreWindow('fan_speed', 2000);
+});
+document.getElementById('fanSpeedSlider').addEventListener('touchstart', () => {
+  setIgnoreWindow('fan_speed', 2000);
 });
 
 document.getElementById('fanSpeedSlider').addEventListener('input', (e) => {
@@ -734,15 +743,17 @@ document.getElementById('fanSpeedSlider').addEventListener('input', (e) => {
 // Use mouseup/touchend for reliable "release" detection on sliders
 document.getElementById('fanSpeedSlider').addEventListener('mouseup', (e) => {
   const value = parseInt(e.target.value);
-  // Set ignore window for manual mode
-  setIgnoreWindow('fan_speed', 1000);
+  // Set ignore window for manual mode (2s for consistency with toggles)
+  setIgnoreWindow('fan_speed', 2000);
+  setExpectedState('fan_speed', value);
   sendCommand({ fan_speed: value });
 });
 
 document.getElementById('fanSpeedSlider').addEventListener('touchend', (e) => {
   const value = parseInt(e.target.value);
-  // Set ignore window for manual mode
-  setIgnoreWindow('fan_speed', 1000);
+  // Set ignore window for manual mode (2s for consistency with toggles)
+  setIgnoreWindow('fan_speed', 2000);
+  setExpectedState('fan_speed', value);
   sendCommand({ fan_speed: value });
 });
 
