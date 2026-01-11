@@ -450,6 +450,13 @@ const ignoreWindows = {
   fan_speed: 0
 };
 
+// Track expected states after commands to reject stale broadcasts
+const expectedStates = {
+  main_loop: null,
+  diversion: null,
+  fan_speed: null
+};
+
 function connectWebSocket() {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const wsUrl = `${protocol}//${window.location.host}/ws`;
@@ -526,24 +533,36 @@ function updateDisplay(data) {
   const fanSpeedInput = document.getElementById('fanSpeedInput');
   const fanSpeedSlider = document.getElementById('fanSpeedSlider');
   
-  // Main loop toggle - update if not ignoring
-  if (!shouldIgnoreUpdate('main_loop')) {
+  // Main loop toggle - only block updates that would CHANGE the current state
+  const inIgnoreWindowMain = Date.now() < ignoreWindows.main_loop;
+  const wouldChangeMain = (mainLoopToggle.checked !== data.main_loop_state);
+  if (!inIgnoreWindowMain || !wouldChangeMain) {
+    // Accept if: outside ignore window OR update matches current state
     if (mainLoopToggle.checked !== data.main_loop_state) {
       mainLoopToggle.checked = data.main_loop_state;
       document.getElementById('mainLoopLabel').textContent = data.main_loop_state ? 'ON' : 'OFF';
+      console.log(`Accepted main_loop update: ${data.main_loop_state}`);
     }
+  } else {
+    console.log(`Blocked main_loop change from ${mainLoopToggle.checked} to ${data.main_loop_state}`);
   }
   
-  // Diversion toggle - update if not ignoring
-  if (!shouldIgnoreUpdate('diversion')) {
+  // Diversion toggle - only block updates that would CHANGE the current state
+  const inIgnoreWindowDiv = Date.now() < ignoreWindows.diversion;
+  const wouldChangeDiv = (diversionToggle.checked !== data.diversion_state);
+  if (!inIgnoreWindowDiv || !wouldChangeDiv) {
+    // Accept if: outside ignore window OR update matches current state
     if (diversionToggle.checked !== data.diversion_state) {
       diversionToggle.checked = data.diversion_state;
       document.getElementById('diversionLabel').textContent = data.diversion_state ? 'ON' : 'OFF';
+      console.log(`Accepted diversion update: ${data.diversion_state}`);
     }
+  } else {
+    console.log(`Blocked diversion change from ${diversionToggle.checked} to ${data.diversion_state}`);
   }
   
   // Fan controls - update if not ignoring and not focused
-  if (!shouldIgnoreUpdate('fan_speed')) {
+  if (!shouldIgnoreUpdate('fan_speed', data.fan_speed)) {
     if (document.activeElement !== fanSpeedInput && document.activeElement !== fanSpeedSlider) {
       fanSpeedInput.value = data.fan_speed;
       fanSpeedSlider.value = data.fan_speed;
@@ -566,17 +585,30 @@ function updateValue(elementId, value, unit = '') {
   }
 }
 
-function shouldIgnoreUpdate(controlName) {
+function shouldIgnoreUpdate(controlName, incomingValue = null) {
   // In automatic mode, never ignore updates
   if (currentMode === 'automatic') return false;
   
   // In manual mode, check if we're within the ignore window
-  return Date.now() < ignoreWindows[controlName];
+  if (Date.now() < ignoreWindows[controlName]) {
+    // NUCLEAR OPTION: Block ALL updates during ignore window
+    console.log(`Blocking ${controlName} update: ${incomingValue} (ignore window active)`);
+    return true; // Ignore everything
+  }
+  
+  // Outside ignore window - clear expected state and accept all updates
+  expectedStates[controlName] = null;
+  return false;
 }
 
 function setIgnoreWindow(controlName, durationMs = 1000) {
   ignoreWindows[controlName] = Date.now() + durationMs;
   console.log(`Set ignore window for ${controlName} for ${durationMs}ms`);
+}
+
+function setExpectedState(controlName, value) {
+  expectedStates[controlName] = value;
+  console.log(`Set expected state for ${controlName}: ${value}`);
 }
 
 function switchMode(mode) {
@@ -639,31 +671,56 @@ function sendCommand(command) {
 }
 
 // Control event listeners
+// Use mousedown/touchstart to set ignore window BEFORE the checkbox changes
+document.getElementById('mainLoopToggle').addEventListener('mousedown', () => {
+  setIgnoreWindow('main_loop', 2000); // 2 second ignore window (outlasts 2 broadcast cycles)
+});
+document.getElementById('mainLoopToggle').addEventListener('touchstart', () => {
+  setIgnoreWindow('main_loop', 2000);
+});
+
 document.getElementById('mainLoopToggle').addEventListener('change', (e) => {
   const state = e.target.checked;
-  // Optimistic UI update
+  // Extend ignore window to ensure it stays active
+  setIgnoreWindow('main_loop', 2000);
+  // Set expected state - only accept server updates that match this
+  setExpectedState('main_loop', state);
+  // Update label
   document.getElementById('mainLoopLabel').textContent = state ? 'ON' : 'OFF';
-  // Set ignore window for manual mode
-  setIgnoreWindow('main_loop', 1000);
   // Send command to server
   sendCommand({ main_loop: state });
 });
 
+document.getElementById('diversionToggle').addEventListener('mousedown', () => {
+  setIgnoreWindow('diversion', 2000); // 2 second ignore window (outlasts 2 broadcast cycles)
+});
+document.getElementById('diversionToggle').addEventListener('touchstart', () => {
+  setIgnoreWindow('diversion', 2000);
+});
+
 document.getElementById('diversionToggle').addEventListener('change', (e) => {
   const state = e.target.checked;
-  // Optimistic UI update
+  // Extend ignore window to ensure it stays active
+  setIgnoreWindow('diversion', 2000);
+  // Set expected state - only accept server updates that match this
+  setExpectedState('diversion', state);
+  // Update label
   document.getElementById('diversionLabel').textContent = state ? 'ON' : 'OFF';
-  // Set ignore window for manual mode
-  setIgnoreWindow('diversion', 1000);
   // Send command to server
   sendCommand({ diversion: state });
 });
 
 // Synchronize fan speed input and slider
+// Use 'input' for real-time visual sync, 'change' for sending commands
 document.getElementById('fanSpeedInput').addEventListener('input', (e) => {
   const value = parseInt(e.target.value) || 0;
   const clamped = Math.max(0, Math.min(100, value));
   document.getElementById('fanSpeedSlider').value = clamped;
+});
+
+document.getElementById('fanSpeedInput').addEventListener('change', (e) => {
+  const value = parseInt(e.target.value) || 0;
+  const clamped = Math.max(0, Math.min(100, value));
   // Set ignore window for manual mode
   setIgnoreWindow('fan_speed', 1000);
   sendCommand({ fan_speed: clamped });
@@ -672,6 +729,18 @@ document.getElementById('fanSpeedInput').addEventListener('input', (e) => {
 document.getElementById('fanSpeedSlider').addEventListener('input', (e) => {
   const value = parseInt(e.target.value);
   document.getElementById('fanSpeedInput').value = value;
+});
+
+// Use mouseup/touchend for reliable "release" detection on sliders
+document.getElementById('fanSpeedSlider').addEventListener('mouseup', (e) => {
+  const value = parseInt(e.target.value);
+  // Set ignore window for manual mode
+  setIgnoreWindow('fan_speed', 1000);
+  sendCommand({ fan_speed: value });
+});
+
+document.getElementById('fanSpeedSlider').addEventListener('touchend', (e) => {
+  const value = parseInt(e.target.value);
   // Set ignore window for manual mode
   setIgnoreWindow('fan_speed', 1000);
   sendCommand({ fan_speed: value });

@@ -244,17 +244,18 @@ async def shutdown_event():
 async def sensor_broadcast_loop():
     """
     Background task that reads sensors and broadcasts to all connected clients.
-    Updates every 0.5 seconds.
+    Sends temperature/sensor data every 5 seconds.
+    Control state changes are sent immediately via command handler.
     """
     print("Sensor broadcast loop started")
     while True:
-        await asyncio.sleep(0.5)  # Update every 500ms
+        await asyncio.sleep(5.0)  # Update every 5 seconds (temperature updates only)
         
         if controller and active_connections:
             try:
                 data = controller.read_sensor_data()
                 message = json.dumps(data)
-                print(f"Broadcasting to {len(active_connections)} clients: {len(message)} bytes")
+                print(f"Broadcasting temperatures to {len(active_connections)} clients: {len(message)} bytes")
                 
                 # Broadcast to all connected clients
                 disconnected = []
