@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Arrow Image Test</title>
+<style>
+  body {
+    margin: 20px;
+    background: #222;
+    color: #fff;
+    font-family: monospace;
+  }
+  .arrow-group {
+    margin: 30px 0;
+    padding: 20px;
+    background: #333;
+    border: 2px solid #555;
+  }
+  .arrow-group h2 {
+    margin-top: 0;
+    color: #ff8844;
+  }
+  .arrow-display {
+    display: inline-block;
+    margin: 10px;
+    text-align: center;
+    padding: 10px;
+    background: #444;
+    border: 1px solid #666;
+  }
+  .arrow-display img {
+    display: block;
+    background: #555;
+    padding: 10px;
+  }
+  .arrow-display p {
+    margin: 5px 0 0 0;
+    font-size: 12px;
+  }
+  .grid-ref {
+    display: inline-block;
+    margin: 20px;
+    padding: 15px;
+    background: #2a2a2a;
+    border: 2px solid #ff8844;
+  }
+  .grid-ref h3 {
+    margin: 0 0 10px 0;
+    color: #ff8844;
+  }
+</style>
+</head>
+<body>
+
+<h1>Arrow Base Orientations Test</h1>
+
+<div class="arrow-group">
+  <h2>RED ARROWS</h2>
+  
+  <div class="arrow-display">
+    <img src="images/256_arrow_red.png" width="128">
+    <p>STRAIGHT</p>
+    <p>No rotation</p>
+  </div>
+  
+  <div class="arrow-display">
+    <img src="images/256_arrow_red_90.png" width="128">
+    <p>90 DEGREE</p>
+    <p>No rotation</p>
+  </div>
+  
+  <div class="arrow-display">
+    <img src="images/256_arrow_red_branch.png" width="128">
+    <p>BRANCH</p>
+    <p>No rotation</p>
+  </div>
+</div>
+
+<div class="arrow-group">
+  <h2>ORANGE ARROWS</h2>
+  
+  <div class="arrow-display">
+    <img src="images/256_arrow_orange.png" width="128">
+    <p>STRAIGHT</p>
+    <p>No rotation</p>
+  </div>
+  
+  <div class="arrow-display">
+    <img src="images/256_arrow_orange_90.png" width="128">
+    <p>90 DEGREE</p>
+    <p>No rotation</p>
+  </div>
+  
+  <div class="arrow-display">
+    <img src="images/256_arrow_orange_branch.png" width="128">
+    <p>BRANCH</p>
+    <p>No rotation</p>
+  </div>
+</div>
+
+<div class="arrow-group">
+  <h2>BLUE ARROWS</h2>
+  
+  <div class="arrow-display">
+    <img src="images/256_arrow_blue.png" width="128">
+    <p>STRAIGHT</p>
+    <p>No rotation</p>
+  </div>
+  
+  <div class="arrow-display">
+    <img src="images/256_arrow_blue_90.png" width="128">
+    <p>90 DEGREE</p>
+    <p>No rotation</p>
+  </div>
+  
+  <div class="arrow-display">
+    <img src="images/256_arrow_blue_branch.png" width="128">
+    <p>BRANCH</p>
+    <p>No rotation</p>
+  </div>
+</div>
+
+<hr style="margin: 40px 0; border-color: #666;">
+
+<h2>ROTATION REFERENCE</h2>
+<p>Standard CSS rotation directions:</p>
+<ul>
+  <li><strong>0deg</strong> = No rotation (base image)</li>
+  <li><strong>90deg</strong> = 90° clockwise (right becomes down)</li>
+  <li><strong>180deg</strong> = 180° rotation (right becomes left)</li>
+  <li><strong>270deg or -90deg</strong> = 90° counter-clockwise (right becomes up)</li>
+</ul>
+
+<hr style="margin: 40px 0; border-color: #666;">
+
+<h2>REQUIRED ORIENTATIONS BY CELL & MODE</h2>
+
+<div class="grid-ref">
+  <h3>Cell 0:1</h3>
+  <p><strong>Main mode:</strong> 90° arrow, rotate 90° CW</p>
+  <p><strong>Diversion mode:</strong> Straight arrow, rotate 180°</p>
+  <p><strong>Mix mode:</strong> Branch arrow, rotate 180°</p>
+</div>
+
+<div class="grid-ref">
+  <h3>Cell 0:0</h3>
+  <p><strong>Diversion mode:</strong> 90° arrow, rotate 90° CW</p>
+  <p><strong>Mix mode:</strong> 90° arrow, rotate 90° CW</p>
+</div>
+
+<div class="grid-ref">
+  <h3>Cell 3:1</h3>
+  <p><strong>Main mode:</strong> 90° arrow, rotate 90° CW</p>
+  <p><strong>Diversion mode:</strong> Straight arrow, rotate 90° CW</p>
+  <p><strong>Mix mode:</strong> Branch arrow, rotate 90° CW</p>
+</div>
+
+</body>
+</html>

@@ -444,6 +444,28 @@
       <input type="range" id="fanSpeedSlider" min="0" max="100" value="0">
     </div>
   </div>
+  
+  <div class="control-group">
+    <label>Data Logging</label>
+    <div class="toggle-container">
+      <label class="toggle">
+        <input type="checkbox" id="saveToggle">
+        <span class="slider"></span>
+      </label>
+      <span class="toggle-label" id="saveLabel">OFF</span>
+    </div>
+  </div>
+  
+  <div class="control-group">
+    <label>Live Graphing</label>
+    <div class="toggle-container">
+      <label class="toggle">
+        <input type="checkbox" id="graphToggle">
+        <span class="slider"></span>
+      </label>
+      <span class="toggle-label" id="graphLabel">OFF</span>
+    </div>
+  </div>
 </div>
 
 </div>
@@ -793,6 +815,24 @@ function updateDisplay(data) {
       fanSpeedSlider.value = data.fan_speed;
     }
   }
+  
+  // Update Save toggle state
+  if (data.save_enabled !== undefined) {
+    const saveToggle = document.getElementById('saveToggle');
+    if (saveToggle.checked !== data.save_enabled) {
+      saveToggle.checked = data.save_enabled;
+      document.getElementById('saveLabel').textContent = data.save_enabled ? 'ON' : 'OFF';
+    }
+  }
+  
+  // Update Graph toggle state
+  if (data.graph_enabled !== undefined) {
+    const graphToggle = document.getElementById('graphToggle');
+    if (graphToggle.checked !== data.graph_enabled) {
+      graphToggle.checked = data.graph_enabled;
+      document.getElementById('graphLabel').textContent = data.graph_enabled ? 'ON' : 'OFF';
+    }
+  }
 }
 
 // Update temperature value with dynamic color based on temperature
@@ -995,6 +1035,27 @@ document.getElementById('fanSpeedSlider').addEventListener('touchend', (e) => {
   setIgnoreWindow('fan_speed', 2000);
   setExpectedState('fan_speed', value);
   sendCommand({ fan_speed: value });
+});
+
+// Save toggle event listener
+document.getElementById('saveToggle').addEventListener('change', (e) => {
+  const state = e.target.checked;
+  document.getElementById('saveLabel').textContent = state ? 'ON' : 'OFF';
+  sendCommand({ save_enabled: state });
+  console.log(`Data logging ${state ? 'enabled' : 'disabled'}`);
+});
+
+// Graph toggle event listener
+document.getElementById('graphToggle').addEventListener('change', (e) => {
+  const state = e.target.checked;
+  document.getElementById('graphLabel').textContent = state ? 'ON' : 'OFF';
+  sendCommand({ graph_enabled: state });
+  console.log(`Live graphing ${state ? 'enabled' : 'disabled'}`);
+  
+  // If enabled, provide a link to the graph page
+  if (state) {
+    console.log('Graph page available at: http://localhost:8000/graph');
+  }
 });
 
 // Mode toggle event listener

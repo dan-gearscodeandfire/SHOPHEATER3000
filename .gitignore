@@ -25,6 +25,9 @@ Thumbs.db
 # Logs
 *.log
 
+# Session data (CSV files from data logging)
+session_*.csv
+
 # Test files
 test_*.py
 *_test.py

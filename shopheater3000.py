@@ -6,7 +6,9 @@ FastAPI backend for real-time monitoring and control
 
 import asyncio
 import json
-from typing import Dict, Optional
+import csv
+from datetime import datetime
+from typing import Dict, Optional, List
 from pathlib import Path
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -54,6 +56,12 @@ class ShopHeaterController:
         self.diversion_state = False  # False=off (HIGH), True=on (LOW)
         self.control_mode = 'manual'  # 'manual' or 'automatic'
         self.flow_mode = 'main'  # 'main', 'diversion', or 'mix'
+        
+        # Data logging and graphing state
+        self.save_enabled = False
+        self.graph_enabled = False
+        self.saved_data = []  # Data collected when save_enabled is True
+        self.graph_data = []  # Data collected when graph_enabled is True
         
         # Set initial safe state
         self.valve_control.all_closed()
@@ -148,7 +156,9 @@ class ShopHeaterController:
             'main_loop_state': self.main_loop_state,
             'diversion_state': self.diversion_state,
             'control_mode': self.control_mode,
-            'flow_mode': self.flow_mode
+            'flow_mode': self.flow_mode,
+            'save_enabled': self.save_enabled,
+            'graph_enabled': self.graph_enabled
         }
         
         return data
@@ -200,6 +210,38 @@ class ShopHeaterController:
         else:
             print(f"Invalid control mode: {mode}. Must be 'manual' or 'automatic'.")
     
+    def set_save_enabled(self, state: bool):
+        """
+        Enable or disable data logging.
+        When enabled, collects data every 5 seconds to be saved to CSV on shutdown.
+        """
+        old_state = self.save_enabled
+        self.save_enabled = state
+        
+        if state and not old_state:
+            # Just enabled - clear old data and start fresh
+            self.saved_data = []
+            print("Data logging ENABLED - will save to CSV on shutdown")
+        elif not state and old_state:
+            print(f"Data logging DISABLED - {len(self.saved_data)} records collected")
+    
+    def set_graph_enabled(self, state: bool):
+        """
+        Enable or disable live graphing.
+        When enabled, collects data every 5 seconds for real-time graphing.
+        When disabled, clears collected data.
+        """
+        old_state = self.graph_enabled
+        self.graph_enabled = state
+        
+        if state and not old_state:
+            # Just enabled - clear old data and start fresh session
+            self.graph_data = []
+            print("Live graphing ENABLED - new graph session started")
+        elif not state and old_state:
+            print(f"Live graphing DISABLED - {len(self.graph_data)} records cleared")
+            self.graph_data = []  # Clear data when disabled
+    
     def calculate_flow_mode(self):
         """
         Calculate current flow mode based on valve states.
@@ -217,9 +259,88 @@ class ShopHeaterController:
         
         print(f"Flow mode calculated: {self.flow_mode.upper()} (main={self.main_loop_state}, diversion={self.diversion_state})")
     
+    def collect_data_point(self):
+        """
+        Collect a single data point for logging/graphing.
+        Called every 5 seconds by the data collection task.
+        """
+        if not self.save_enabled and not self.graph_enabled:
+            return  # Nothing to do
+        
+        # Get current sensor data
+        data = self.read_sensor_data()
+        
+        # Create a flattened data point with timestamp
+        data_point = {
+            'timestamp': datetime.now().isoformat(),
+            # Temperatures
+            'water_hot': data['temperatures']['water_hot'],
+            'water_reservoir': data['temperatures']['water_reservoir'],
+            'water_mix': data['temperatures']['water_mix'],
+            'water_cold': data['temperatures']['water_cold'],
+            'air_cool': data['temperatures']['air_cool'],
+            'air_heated': data['temperatures']['air_heated'],
+            # Deltas
+            'delta_water_heater': data['deltas']['delta_water_heater'],
+            'delta_water_radiator': data['deltas']['delta_water_radiator'],
+            'delta_air': data['deltas']['delta_air'],
+            # Other data
+            'flow_rate': data['flow_rate'],
+            'fan_speed': data['fan_speed'],
+            'main_loop_state': data['main_loop_state'],
+            'diversion_state': data['diversion_state'],
+            'control_mode': data['control_mode'],
+            'flow_mode': data['flow_mode']
+        }
+        
+        # Add to appropriate lists
+        if self.save_enabled:
+            self.saved_data.append(data_point)
+        
+        if self.graph_enabled:
+            self.graph_data.append(data_point)
+    
+    def save_to_csv(self):
+        """
+        Save collected data to a CSV file.
+        Called on shutdown if save_enabled was used during the session.
+        """
+        if not self.saved_data:
+            print("No data to save")
+            return
+        
+        # Generate filename with session timestamp
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        filename = f"session_{timestamp}.csv"
+        filepath = Path(__file__).parent / filename
+        
+        # Define CSV fieldnames
+        fieldnames = [
+            'timestamp', 
+            'water_hot', 'water_reservoir', 'water_mix', 'water_cold', 'air_cool', 'air_heated',
+            'delta_water_heater', 'delta_water_radiator', 'delta_air',
+            'flow_rate', 'fan_speed', 'main_loop_state', 'diversion_state', 
+            'control_mode', 'flow_mode'
+        ]
+        
+        try:
+            with open(filepath, 'w', newline='') as csvfile:
+                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                writer.writeheader()
+                writer.writerows(self.saved_data)
+            
+            print(f"✅ Saved {len(self.saved_data)} records to {filename}")
+        except Exception as e:
+            print(f"❌ Error saving CSV: {e}")
+    
     def cleanup(self):
-        """Clean up all hardware resources."""
+        """Clean up all hardware resources and save data if needed."""
         print("Cleaning up hardware...")
+        
+        # Save data to CSV if we collected any
+        if self.saved_data:
+            self.save_to_csv()
+        
         self.fan.cleanup()
         self.flow_meter.cleanup()
         self.valve_control.cleanup()
@@ -247,9 +368,10 @@ async def startup_event():
         controller = ShopHeaterController()
         print("Controller initialized successfully in startup event")
         
-        # Start background task for sensor reading
+        # Start background tasks
         asyncio.create_task(sensor_broadcast_loop())
-        print("Background task created")
+        asyncio.create_task(data_collection_loop())
+        print("Background tasks created (sensor broadcast + data collection)")
     except Exception as e:
         print(f"ERROR IN STARTUP: {e}")
         import traceback
@@ -301,6 +423,36 @@ async def sensor_broadcast_loop():
                 traceback.print_exc()
 
 
+async def data_collection_loop():
+    """
+    Background task that collects data points every 5 seconds for logging/graphing.
+    Runs independently of sensor broadcast to ensure consistent data collection.
+    """
+    print("Data collection loop started")
+    while True:
+        await asyncio.sleep(5.0)  # Collect data every 5 seconds
+        
+        if controller:
+            try:
+                # Collect data if either save or graph is enabled
+                if controller.save_enabled or controller.graph_enabled:
+                    controller.collect_data_point()
+                    
+                    # Log collection status
+                    status_parts = []
+                    if controller.save_enabled:
+                        status_parts.append(f"Save: {len(controller.saved_data)} records")
+                    if controller.graph_enabled:
+                        status_parts.append(f"Graph: {len(controller.graph_data)} records")
+                    
+                    if status_parts:
+                        print(f"Data collected - {', '.join(status_parts)}")
+            except Exception as e:
+                print(f"Error in data collection: {e}")
+                import traceback
+                traceback.print_exc()
+
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     """WebSocket endpoint for real-time data and control."""
@@ -341,6 +493,12 @@ async def websocket_endpoint(websocket: WebSocket):
                 if 'control_mode' in command:
                     controller.set_control_mode(str(command['control_mode']))
                 
+                if 'save_enabled' in command:
+                    controller.set_save_enabled(bool(command['save_enabled']))
+                
+                if 'graph_enabled' in command:
+                    controller.set_graph_enabled(bool(command['graph_enabled']))
+                
                 # Immediately send updated state back to client after command
                 updated_data = controller.read_sensor_data()
                 await websocket.send_text(json.dumps(updated_data))
@@ -362,6 +520,18 @@ async def websocket_endpoint(websocket: WebSocket):
 async def read_root():
     """Serve the main HTML page."""
     return FileResponse("web_ui.html")
+
+
+@app.get("/graph")
+async def read_graph():
+    """Serve the graph page."""
+    return FileResponse("graph.html")
+
+
+@app.get("/test_arrows.html")
+async def test_arrows():
+    """Serve the arrow test page."""
+    return FileResponse("test_arrows.html")
 
 
 @app.get("/images/{filename}")

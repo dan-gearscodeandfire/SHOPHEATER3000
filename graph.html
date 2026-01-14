@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shop Heater - Live Graph</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+      color: #fff;
+      padding: 20px;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 10px;
+      font-size: 32px;
+    }
+
+    .status {
+      text-align: center;
+      margin-bottom: 20px;
+      font-size: 14px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .status-indicator {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .status-connected {
+      background: #4CAF50;
+    }
+
+    .status-disconnected {
+      background: #f44336;
+    }
+
+    .controls-panel {
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .controls-panel h2 {
+      margin-bottom: 15px;
+      font-size: 20px;
+    }
+
+    .checkbox-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+
+    .checkbox-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .checkbox-item input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+    }
+
+    .checkbox-item label {
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      background: #4CAF50;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: bold;
+      transition: background 0.3s;
+    }
+
+    button:hover {
+      background: #45a049;
+    }
+
+    button.secondary {
+      background: #2196F3;
+    }
+
+    button.secondary:hover {
+      background: #0b7dda;
+    }
+
+    .chart-container {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    }
+
+    .info-message {
+      background: rgba(255, 165, 0, 0.2);
+      border: 1px solid #FFA500;
+      border-radius: 4px;
+      padding: 15px;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    .back-link {
+      display: inline-block;
+      margin-bottom: 15px;
+      color: #fff;
+      text-decoration: none;
+      font-size: 16px;
+      transition: opacity 0.3s;
+    }
+
+    .back-link:hover {
+      opacity: 0.8;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <a href="/" class="back-link">← Back to Control Panel</a>
+  
+  <h1>📊 Shop Heater - Live Graph</h1>
+  
+  <div class="status">
+    <span id="statusIndicator" class="status-indicator status-disconnected"></span>
+    <span id="statusText">Connecting...</span>
+  </div>
+
+  <div id="disabledMessage" class="info-message" style="display: none;">
+    ⚠️ Graphing is currently disabled. Enable the "Live Graphing" toggle on the main control panel to start collecting data.
+  </div>
+
+  <div class="controls-panel">
+    <h2>Select Data Series</h2>
+    
+    <div class="checkbox-grid" id="checkboxContainer">
+      <!-- Checkboxes will be generated dynamically -->
+    </div>
+
+    <div class="button-group">
+      <button onclick="selectAll()">Select All</button>
+      <button onclick="deselectAll()">Deselect All</button>
+      <button onclick="selectTemperatures()">Temperatures Only</button>
+      <button onclick="selectDeltas()">Deltas Only</button>
+      <button class="secondary" onclick="clearGraph()">Clear Graph</button>
+    </div>
+  </div>
+
+  <div class="chart-container">
+    <canvas id="dataChart"></canvas>
+  </div>
+</div>
+
+<script>
+// Data series configuration
+const dataSeries = {
+  temperatures: [
+    { key: 'water_hot', label: 'Water Hot', color: '#FF3333' },
+    { key: 'water_reservoir', label: 'Water Reservoir', color: '#FF8800' },
+    { key: 'water_mix', label: 'Water Mix', color: '#FFAA00' },
+    { key: 'water_cold', label: 'Water Cold', color: '#3399FF' },
+    { key: 'air_cool', label: 'Air Cool', color: '#00CCFF' },
+    { key: 'air_heated', label: 'Air Heated', color: '#FF6600' }
+  ],
+  deltas: [
+    { key: 'delta_water_heater', label: 'Delta Heater', color: '#9C27B0' },
+    { key: 'delta_water_radiator', label: 'Delta Radiator', color: '#E91E63' },
+    { key: 'delta_air', label: 'Delta Air', color: '#673AB7' }
+  ],
+  other: [
+    { key: 'flow_rate', label: 'Flow Rate (L/min)', color: '#009688' },
+    { key: 'fan_speed', label: 'Fan Speed (%)', color: '#795548' }
+  ]
+};
+
+// Flatten all series
+const allSeries = [
+  ...dataSeries.temperatures,
+  ...dataSeries.deltas,
+  ...dataSeries.other
+];
+
+// WebSocket connection
+let ws = null;
+let graphStartTime = null;
+let graphData = [];  // Array of data points with timestamps
+
+// Chart instance
+let chart = null;
+
+// Generate checkboxes
+function generateCheckboxes() {
+  const container = document.getElementById('checkboxContainer');
+  container.innerHTML = '';
+  
+  allSeries.forEach(series => {
+    const div = document.createElement('div');
+    div.className = 'checkbox-item';
+    
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.id = `cb_${series.key}`;
+    checkbox.checked = false;
+    checkbox.addEventListener('change', updateChart);
+    
+    const label = document.createElement('label');
+    label.htmlFor = `cb_${series.key}`;
+    label.textContent = series.label;
+    label.style.color = series.color;
+    label.style.fontWeight = 'bold';
+    
+    div.appendChild(checkbox);
+    div.appendChild(label);
+    container.appendChild(div);
+  });
+}
+
+// Initialize Chart.js
+function initChart() {
+  const ctx = document.getElementById('dataChart').getContext('2d');
+  
+  chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      datasets: []
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      aspectRatio: 2.5,
+      interaction: {
+        mode: 'index',
+        intersect: false
+      },
+      plugins: {
+        title: {
+          display: true,
+          text: 'Real-Time Data',
+          font: { size: 18 }
+        },
+        legend: {
+          display: true,
+          position: 'top'
+        },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              let label = context.dataset.label || '';
+              if (label) {
+                label += ': ';
+              }
+              label += context.parsed.y.toFixed(2);
+              return label;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          type: 'linear',
+          title: {
+            display: true,
+            text: 'Time (seconds since start)'
+          },
+          ticks: {
+            callback: function(value) {
+              return Math.floor(value);
+            }
+          }
+        },
+        y: {
+          title: {
+            display: true,
+            text: 'Value'
+          }
+        }
+      }
+    }
+  });
+}
+
+// Update chart with selected series
+function updateChart() {
+  if (!chart) return;
+  
+  // Get selected series
+  const selectedSeries = allSeries.filter(series => {
+    return document.getElementById(`cb_${series.key}`).checked;
+  });
+  
+  // Build datasets
+  const datasets = selectedSeries.map(series => {
+    const dataPoints = graphData.map(point => ({
+      x: point.time,
+      y: point.data[series.key] || 0
+    }));
+    
+    return {
+      label: series.label,
+      data: dataPoints,
+      borderColor: series.color,
+      backgroundColor: series.color + '33',  // Add transparency
+      borderWidth: 2,
+      pointRadius: 1,
+      tension: 0.1
+    };
+  });
+  
+  chart.data.datasets = datasets;
+  chart.update();
+}
+
+// Helper functions for checkbox selection
+function selectAll() {
+  allSeries.forEach(series => {
+    document.getElementById(`cb_${series.key}`).checked = true;
+  });
+  updateChart();
+}
+
+function deselectAll() {
+  allSeries.forEach(series => {
+    document.getElementById(`cb_${series.key}`).checked = false;
+  });
+  updateChart();
+}
+
+function selectTemperatures() {
+  deselectAll();
+  dataSeries.temperatures.forEach(series => {
+    document.getElementById(`cb_${series.key}`).checked = true;
+  });
+  updateChart();
+}
+
+function selectDeltas() {
+  deselectAll();
+  dataSeries.deltas.forEach(series => {
+    document.getElementById(`cb_${series.key}`).checked = true;
+  });
+  updateChart();
+}
+
+function clearGraph() {
+  graphData = [];
+  graphStartTime = Date.now();
+  updateChart();
+  console.log('Graph cleared');
+}
+
+// WebSocket connection
+function connectWebSocket() {
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const wsUrl = `${protocol}//${window.location.host}/ws`;
+  
+  ws = new WebSocket(wsUrl);
+  
+  ws.onopen = () => {
+    console.log('WebSocket connected');
+    document.getElementById('statusIndicator').className = 'status-indicator status-connected';
+    document.getElementById('statusText').textContent = 'Connected';
+    
+    // Initialize graph start time
+    if (!graphStartTime) {
+      graphStartTime = Date.now();
+    }
+  };
+  
+  ws.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      
+      // Check if graphing is enabled
+      if (data.graph_enabled === false) {
+        document.getElementById('disabledMessage').style.display = 'block';
+        return;
+      } else {
+        document.getElementById('disabledMessage').style.display = 'none';
+      }
+      
+      // Calculate time since start
+      const currentTime = Date.now();
+      const timeSinceStart = (currentTime - graphStartTime) / 1000;  // Convert to seconds
+      
+      // Create data point
+      const dataPoint = {
+        time: timeSinceStart,
+        data: {
+          // Temperatures
+          water_hot: data.temperatures?.water_hot || 0,
+          water_reservoir: data.temperatures?.water_reservoir || 0,
+          water_mix: data.temperatures?.water_mix || 0,
+          water_cold: data.temperatures?.water_cold || 0,
+          air_cool: data.temperatures?.air_cool || 0,
+          air_heated: data.temperatures?.air_heated || 0,
+          // Deltas
+          delta_water_heater: data.deltas?.delta_water_heater || 0,
+          delta_water_radiator: data.deltas?.delta_water_radiator || 0,
+          delta_air: data.deltas?.delta_air || 0,
+          // Other
+          flow_rate: data.flow_rate || 0,
+          fan_speed: data.fan_speed || 0
+        }
+      };
+      
+      // Add to graph data
+      graphData.push(dataPoint);
+      
+      // Keep only last 300 points (25 minutes at 5 second intervals)
+      if (graphData.length > 300) {
+        graphData.shift();
+      }
+      
+      // Update chart
+      updateChart();
+      
+    } catch (error) {
+      console.error('Error processing WebSocket message:', error);
+    }
+  };
+  
+  ws.onclose = () => {
+    console.log('WebSocket disconnected');
+    document.getElementById('statusIndicator').className = 'status-indicator status-disconnected';
+    document.getElementById('statusText').textContent = 'Disconnected - Reconnecting...';
+    
+    // Attempt to reconnect after 3 seconds
+    setTimeout(connectWebSocket, 3000);
+  };
+  
+  ws.onerror = (error) => {
+    console.error('WebSocket error:', error);
+  };
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', () => {
+  generateCheckboxes();
+  initChart();
+  connectWebSocket();
+  
+  // Select temperatures by default
+  selectTemperatures();
+});
+</script>
+
+</body>
+</html>
+
