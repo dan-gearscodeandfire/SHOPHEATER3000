@@ -511,7 +511,7 @@ function shouldIgnoreUpdate(controlName, incomingValue) {
   return false;
 }
 
-function setIgnoreWindow(controlName, durationMs = 2000) {
+function setIgnoreWindow(controlName, durationMs = 500) {
   ignoreWindows[controlName] = Date.now() + durationMs;
 }
 
@@ -566,30 +566,30 @@ function sendCommand(command) {
 
 // Control event listeners
 document.getElementById('mainLoopToggle').addEventListener('mousedown', () => {
-  setIgnoreWindow('main_loop', 2000);
+  setIgnoreWindow('main_loop', 500);
 });
 document.getElementById('mainLoopToggle').addEventListener('touchstart', () => {
-  setIgnoreWindow('main_loop', 2000);
+  setIgnoreWindow('main_loop', 500);
 });
 
 document.getElementById('mainLoopToggle').addEventListener('change', (e) => {
   const state = e.target.checked;
-  setIgnoreWindow('main_loop', 2000);
+  setIgnoreWindow('main_loop', 500);
   setExpectedState('main_loop', state);
   document.getElementById('mainLoopLabel').textContent = state ? 'ON' : 'OFF';
   sendCommand({ main_loop: state });
 });
 
 document.getElementById('diversionToggle').addEventListener('mousedown', () => {
-  setIgnoreWindow('diversion', 2000);
+  setIgnoreWindow('diversion', 500);
 });
 document.getElementById('diversionToggle').addEventListener('touchstart', () => {
-  setIgnoreWindow('diversion', 2000);
+  setIgnoreWindow('diversion', 500);
 });
 
 document.getElementById('diversionToggle').addEventListener('change', (e) => {
   const state = e.target.checked;
-  setIgnoreWindow('diversion', 2000);
+  setIgnoreWindow('diversion', 500);
   setExpectedState('diversion', state);
   document.getElementById('diversionLabel').textContent = state ? 'ON' : 'OFF';
   sendCommand({ diversion: state });
@@ -604,16 +604,16 @@ document.getElementById('fanSpeedInput').addEventListener('input', (e) => {
 document.getElementById('fanSpeedInput').addEventListener('change', (e) => {
   const value = parseInt(e.target.value) || 0;
   const clamped = Math.max(0, Math.min(100, value));
-  setIgnoreWindow('fan_speed', 2000);
+  setIgnoreWindow('fan_speed', 500);
   setExpectedState('fan_speed', clamped);
   sendCommand({ fan_speed: clamped });
 });
 
 document.getElementById('fanSpeedSlider').addEventListener('mousedown', () => {
-  setIgnoreWindow('fan_speed', 2000);
+  setIgnoreWindow('fan_speed', 500);
 });
 document.getElementById('fanSpeedSlider').addEventListener('touchstart', () => {
-  setIgnoreWindow('fan_speed', 2000);
+  setIgnoreWindow('fan_speed', 500);
 });
 
 document.getElementById('fanSpeedSlider').addEventListener('input', (e) => {
@@ -623,14 +623,14 @@ document.getElementById('fanSpeedSlider').addEventListener('input', (e) => {
 
 document.getElementById('fanSpeedSlider').addEventListener('mouseup', (e) => {
   const value = parseInt(e.target.value);
-  setIgnoreWindow('fan_speed', 2000);
+  setIgnoreWindow('fan_speed', 500);
   setExpectedState('fan_speed', value);
   sendCommand({ fan_speed: value });
 });
 
 document.getElementById('fanSpeedSlider').addEventListener('touchend', (e) => {
   const value = parseInt(e.target.value);
-  setIgnoreWindow('fan_speed', 2000);
+  setIgnoreWindow('fan_speed', 500);
   setExpectedState('fan_speed', value);
   sendCommand({ fan_speed: value });
 });
