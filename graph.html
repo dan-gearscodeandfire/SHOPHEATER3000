@@ -155,17 +155,21 @@
 <body>
 
 <div class="container">
-  <a href="/" class="back-link">← Back to Control Panel</a>
+  <a href="/" class="back-link">← Back to Dashboard</a>
   
-  <h1>📊 Shop Heater - Live Graph</h1>
+  <h1 id="pageTitle">📊 Shop Heater - Live Graph</h1>
   
-  <div class="status">
+  <div class="status" id="statusContainer">
     <span id="statusIndicator" class="status-indicator status-disconnected"></span>
     <span id="statusText">Connecting...</span>
   </div>
 
   <div id="disabledMessage" class="info-message" style="display: none;">
-    ⚠️ Graphing is currently disabled. Enable the "Live Graphing" toggle on the main control panel to start collecting data.
+    ⚠️ Graphing is currently disabled. Enable the "Live Graphing" toggle on the controls page to start collecting data.
+  </div>
+
+  <div id="historicalInfo" class="info-message" style="display: none;">
+    📜 Viewing historical session
   </div>
 
   <div class="controls-panel">
@@ -217,6 +221,11 @@ const allSeries = [
   ...dataSeries.deltas,
   ...dataSeries.other
 ];
+
+// Mode detection
+const urlParams = new URLSearchParams(window.location.search);
+const sessionParam = urlParams.get('session');
+const isHistoricalMode = !!sessionParam;
 
 // WebSocket connection
 let ws = null;
@@ -386,7 +395,62 @@ function clearGraph() {
   console.log('Graph cleared');
 }
 
-// WebSocket connection
+// Load historical session data
+async function loadHistoricalSession(filename) {
+  try {
+    console.log(`Loading historical session: ${filename}`);
+    const response = await fetch(`/api/load_session/${encodeURIComponent(filename)}`);
+    const sessionData = await response.json();
+    
+    if (sessionData.error) {
+      console.error('Error loading session:', sessionData.error);
+      document.getElementById('statusText').textContent = 'Error: ' + sessionData.error;
+      return;
+    }
+    
+    // Update UI for historical mode
+    document.getElementById('pageTitle').textContent = '📜 Historical Graph Session';
+    document.getElementById('statusContainer').style.display = 'none';
+    document.getElementById('historicalInfo').style.display = 'block';
+    document.getElementById('historicalInfo').textContent = 
+      `📜 Viewing: ${filename} | ${sessionData.metadata.data_points} points | Duration: ${Math.round(sessionData.metadata.duration_seconds)}s`;
+    
+    // Convert historical data to graph format
+    graphData = sessionData.data.map((point, index) => {
+      // Calculate time from start
+      const firstTime = new Date(sessionData.data[0].timestamp);
+      const pointTime = new Date(point.timestamp);
+      const timeSinceStart = (pointTime - firstTime) / 1000;
+      
+      return {
+        time: timeSinceStart,
+        data: {
+          water_hot: point.water_hot || 0,
+          water_reservoir: point.water_reservoir || 0,
+          water_mix: point.water_mix || 0,
+          water_cold: point.water_cold || 0,
+          air_cool: point.air_cool || 0,
+          air_heated: point.air_heated || 0,
+          delta_water_heater: point.delta_water_heater || 0,
+          delta_water_radiator: point.delta_water_radiator || 0,
+          delta_air: point.delta_air || 0,
+          flow_rate: point.flow_rate || 0,
+          fan_speed: point.fan_speed || 0
+        }
+      };
+    });
+    
+    graphStartTime = 0;  // Start from 0 for historical data
+    updateChart();
+    console.log(`Loaded ${graphData.length} data points`);
+    
+  } catch (error) {
+    console.error('Error loading historical session:', error);
+    document.getElementById('statusText').textContent = 'Error loading session';
+  }
+}
+
+// WebSocket connection (for live mode only)
 function connectWebSocket() {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const wsUrl = `${protocol}//${window.location.host}/ws`;
@@ -475,7 +539,16 @@ function connectWebSocket() {
 document.addEventListener('DOMContentLoaded', () => {
   generateCheckboxes();
   initChart();
-  connectWebSocket();
+  
+  if (isHistoricalMode) {
+    // Historical mode - load session data
+    console.log('Historical mode - loading session:', sessionParam);
+    loadHistoricalSession(sessionParam);
+  } else {
+    // Live mode - connect to WebSocket
+    console.log('Live mode - connecting to WebSocket');
+    connectWebSocket();
+  }
   
   // Select temperatures by default
   selectTemperatures();

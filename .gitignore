@@ -27,6 +27,10 @@ Thumbs.db
 
 # Session data (CSV files from data logging)
 session_*.csv
+data_logs/*
+!data_logs/.gitkeep
+graph_sessions/*
+!graph_sessions/.gitkeep
 
 # Test files
 test_*.py

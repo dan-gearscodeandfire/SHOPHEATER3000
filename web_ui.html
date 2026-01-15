@@ -309,6 +309,34 @@
     background: #666;
     cursor: not-allowed;
   }
+
+  /* Navigation links */
+  .nav-links {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+
+  .nav-links a {
+    color: #fff;
+    text-decoration: none;
+    padding: 8px 16px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    transition: background 0.3s;
+    font-size: 14px;
+  }
+
+  .nav-links a:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
+
+  .nav-links a.active {
+    background: #4CAF50;
+    font-weight: bold;
+  }
 </style>
 </head>
 
@@ -316,7 +344,14 @@
 
 <div class="container">
 
-<h2>Shop Heater Control <span class="status-indicator" id="wsStatus"></span></h2>
+<h2>📊 Shop Heater Dashboard <span class="status-indicator" id="wsStatus"></span></h2>
+
+<div class="nav-links">
+  <a href="/" class="active">Dashboard</a>
+  <a href="/controls">Controls</a>
+  <a href="/graph">Live Graph</a>
+  <a href="/explorer">Data Explorer</a>
+</div>
 
 <div class="grid">
 
@@ -393,79 +428,6 @@
     <div class="value temp-value" id="air_heated">--</div>
   </div>
 
-</div>
-
-<!-- Control Panel -->
-<div class="controls" id="controlsPanel">
-  <h3 style="margin-top:0; color:#fff;">Controls</h3>
-  
-  <!-- Mode Selector -->
-  <div class="mode-selector" id="modeSelector">
-    <div class="mode-label">Control Mode:</div>
-    <div style="display: flex; gap: 10px; align-items: center;">
-      <span class="mode-badge" id="modeBadge">MANUAL</span>
-      <label class="toggle">
-        <input type="checkbox" id="modeToggle">
-        <span class="slider"></span>
-      </label>
-    </div>
-  </div>
-  
-  <div class="automation-notice" id="automationNotice">
-    System is running automated logic - controls are read-only
-  </div>
-  
-  <div class="control-group">
-    <label>Main Loop Solenoid</label>
-    <div class="toggle-container">
-      <label class="toggle">
-        <input type="checkbox" id="mainLoopToggle">
-        <span class="slider"></span>
-      </label>
-      <span class="toggle-label" id="mainLoopLabel">OFF</span>
-    </div>
-  </div>
-  
-  <div class="control-group">
-    <label>Diversion Solenoid</label>
-    <div class="toggle-container">
-      <label class="toggle">
-        <input type="checkbox" id="diversionToggle">
-        <span class="slider"></span>
-      </label>
-      <span class="toggle-label" id="diversionLabel">OFF</span>
-    </div>
-  </div>
-  
-  <div class="control-group">
-    <label>Fan Speed (0-100)</label>
-    <div class="fan-controls">
-      <input type="number" id="fanSpeedInput" min="0" max="100" value="0">
-      <input type="range" id="fanSpeedSlider" min="0" max="100" value="0">
-    </div>
-  </div>
-  
-  <div class="control-group">
-    <label>Data Logging</label>
-    <div class="toggle-container">
-      <label class="toggle">
-        <input type="checkbox" id="saveToggle">
-        <span class="slider"></span>
-      </label>
-      <span class="toggle-label" id="saveLabel">OFF</span>
-    </div>
-  </div>
-  
-  <div class="control-group">
-    <label>Live Graphing</label>
-    <div class="toggle-container">
-      <label class="toggle">
-        <input type="checkbox" id="graphToggle">
-        <span class="slider"></span>
-      </label>
-      <span class="toggle-label" id="graphLabel">OFF</span>
-    </div>
-  </div>
 </div>
 
 </div>
@@ -949,121 +911,6 @@ function sendCommand(command) {
     console.error('WebSocket not open. State:', ws ? ws.readyState : 'null');
   }
 }
-
-// Control event listeners
-// Use mousedown/touchstart to set ignore window BEFORE the checkbox changes
-document.getElementById('mainLoopToggle').addEventListener('mousedown', () => {
-  setIgnoreWindow('main_loop', 2000); // 2 second ignore window (outlasts 2 broadcast cycles)
-});
-document.getElementById('mainLoopToggle').addEventListener('touchstart', () => {
-  setIgnoreWindow('main_loop', 2000);
-});
-
-document.getElementById('mainLoopToggle').addEventListener('change', (e) => {
-  const state = e.target.checked;
-  // Extend ignore window to ensure it stays active
-  setIgnoreWindow('main_loop', 2000);
-  // Set expected state - only accept server updates that match this
-  setExpectedState('main_loop', state);
-  // Update label
-  document.getElementById('mainLoopLabel').textContent = state ? 'ON' : 'OFF';
-  // Send command to server
-  sendCommand({ main_loop: state });
-});
-
-document.getElementById('diversionToggle').addEventListener('mousedown', () => {
-  setIgnoreWindow('diversion', 2000); // 2 second ignore window (outlasts 2 broadcast cycles)
-});
-document.getElementById('diversionToggle').addEventListener('touchstart', () => {
-  setIgnoreWindow('diversion', 2000);
-});
-
-document.getElementById('diversionToggle').addEventListener('change', (e) => {
-  const state = e.target.checked;
-  // Extend ignore window to ensure it stays active
-  setIgnoreWindow('diversion', 2000);
-  // Set expected state - only accept server updates that match this
-  setExpectedState('diversion', state);
-  // Update label
-  document.getElementById('diversionLabel').textContent = state ? 'ON' : 'OFF';
-  // Send command to server
-  sendCommand({ diversion: state });
-});
-
-// Synchronize fan speed input and slider
-// Use 'input' for real-time visual sync, 'change' for sending commands
-document.getElementById('fanSpeedInput').addEventListener('input', (e) => {
-  const value = parseInt(e.target.value) || 0;
-  const clamped = Math.max(0, Math.min(100, value));
-  document.getElementById('fanSpeedSlider').value = clamped;
-});
-
-document.getElementById('fanSpeedInput').addEventListener('change', (e) => {
-  const value = parseInt(e.target.value) || 0;
-  const clamped = Math.max(0, Math.min(100, value));
-  // Set ignore window for manual mode (2s for consistency with toggles)
-  setIgnoreWindow('fan_speed', 2000);
-  setExpectedState('fan_speed', clamped);
-  sendCommand({ fan_speed: clamped });
-});
-
-// Set ignore window when slider drag starts
-document.getElementById('fanSpeedSlider').addEventListener('mousedown', () => {
-  setIgnoreWindow('fan_speed', 2000);
-});
-document.getElementById('fanSpeedSlider').addEventListener('touchstart', () => {
-  setIgnoreWindow('fan_speed', 2000);
-});
-
-document.getElementById('fanSpeedSlider').addEventListener('input', (e) => {
-  const value = parseInt(e.target.value);
-  document.getElementById('fanSpeedInput').value = value;
-});
-
-// Use mouseup/touchend for reliable "release" detection on sliders
-document.getElementById('fanSpeedSlider').addEventListener('mouseup', (e) => {
-  const value = parseInt(e.target.value);
-  // Set ignore window for manual mode (2s for consistency with toggles)
-  setIgnoreWindow('fan_speed', 2000);
-  setExpectedState('fan_speed', value);
-  sendCommand({ fan_speed: value });
-});
-
-document.getElementById('fanSpeedSlider').addEventListener('touchend', (e) => {
-  const value = parseInt(e.target.value);
-  // Set ignore window for manual mode (2s for consistency with toggles)
-  setIgnoreWindow('fan_speed', 2000);
-  setExpectedState('fan_speed', value);
-  sendCommand({ fan_speed: value });
-});
-
-// Save toggle event listener
-document.getElementById('saveToggle').addEventListener('change', (e) => {
-  const state = e.target.checked;
-  document.getElementById('saveLabel').textContent = state ? 'ON' : 'OFF';
-  sendCommand({ save_enabled: state });
-  console.log(`Data logging ${state ? 'enabled' : 'disabled'}`);
-});
-
-// Graph toggle event listener
-document.getElementById('graphToggle').addEventListener('change', (e) => {
-  const state = e.target.checked;
-  document.getElementById('graphLabel').textContent = state ? 'ON' : 'OFF';
-  sendCommand({ graph_enabled: state });
-  console.log(`Live graphing ${state ? 'enabled' : 'disabled'}`);
-  
-  // If enabled, provide a link to the graph page
-  if (state) {
-    console.log('Graph page available at: http://localhost:8000/graph');
-  }
-});
-
-// Mode toggle event listener
-document.getElementById('modeToggle').addEventListener('change', (e) => {
-  const newMode = e.target.checked ? 'automatic' : 'manual';
-  sendCommand({ control_mode: newMode });
-  // Mode will be updated when server confirms via WebSocket
-});
 
 // Connect on page load
 connectWebSocket();

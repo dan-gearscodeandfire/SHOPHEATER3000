@@ -62,6 +62,8 @@ class ShopHeaterController:
         self.graph_enabled = False
         self.saved_data = []  # Data collected when save_enabled is True
         self.graph_data = []  # Data collected when graph_enabled is True
+        self.save_start_time = None  # Timestamp when logging started
+        self.graph_start_time = None  # Timestamp when graphing started
         
         # Set initial safe state
         self.valve_control.all_closed()
@@ -219,17 +221,21 @@ class ShopHeaterController:
         self.save_enabled = state
         
         if state and not old_state:
-            # Just enabled - clear old data and start fresh
+            # Just enabled - clear old data and start fresh session
             self.saved_data = []
-            print("Data logging ENABLED - will save to CSV on shutdown")
+            self.save_start_time = datetime.now()
+            print(f"Data logging ENABLED - session started at {self.save_start_time.strftime('%Y-%m-%d %H:%M:%S')}")
         elif not state and old_state:
-            print(f"Data logging DISABLED - {len(self.saved_data)} records collected")
+            # Just disabled - save the session now
+            if self.saved_data:
+                self.save_to_csv()
+            print(f"Data logging DISABLED - {len(self.saved_data)} records saved")
     
     def set_graph_enabled(self, state: bool):
         """
         Enable or disable live graphing.
         When enabled, collects data every 5 seconds for real-time graphing.
-        When disabled, clears collected data.
+        When disabled, saves session and clears data.
         """
         old_state = self.graph_enabled
         self.graph_enabled = state
@@ -237,10 +243,14 @@ class ShopHeaterController:
         if state and not old_state:
             # Just enabled - clear old data and start fresh session
             self.graph_data = []
-            print("Live graphing ENABLED - new graph session started")
+            self.graph_start_time = datetime.now()
+            print(f"Live graphing ENABLED - session started at {self.graph_start_time.strftime('%Y-%m-%d %H:%M:%S')}")
         elif not state and old_state:
-            print(f"Live graphing DISABLED - {len(self.graph_data)} records cleared")
-            self.graph_data = []  # Clear data when disabled
+            # Just disabled - save the session
+            if self.graph_data:
+                self.save_graph_session()
+            print(f"Live graphing DISABLED - {len(self.graph_data)} records saved")
+            self.graph_data = []  # Clear data after saving
     
     def calculate_flow_mode(self):
         """
@@ -302,17 +312,21 @@ class ShopHeaterController:
     
     def save_to_csv(self):
         """
-        Save collected data to a CSV file.
-        Called on shutdown if save_enabled was used during the session.
+        Save collected data to a CSV file in data_logs/ subdirectory.
+        Uses timestamp from when logging started (not shutdown).
         """
-        if not self.saved_data:
+        if not self.saved_data or not self.save_start_time:
             print("No data to save")
             return
         
-        # Generate filename with session timestamp
-        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        # Generate filename with session START timestamp
+        timestamp = self.save_start_time.strftime("%Y-%m-%d_%H-%M-%S")
         filename = f"session_{timestamp}.csv"
-        filepath = Path(__file__).parent / filename
+        
+        # Save to data_logs subdirectory
+        data_dir = Path(__file__).parent / "data_logs"
+        data_dir.mkdir(exist_ok=True)
+        filepath = data_dir / filename
         
         # Define CSV fieldnames
         fieldnames = [
@@ -329,9 +343,49 @@ class ShopHeaterController:
                 writer.writeheader()
                 writer.writerows(self.saved_data)
             
-            print(f"✅ Saved {len(self.saved_data)} records to {filename}")
+            print(f"✅ Saved {len(self.saved_data)} records to data_logs/{filename}")
         except Exception as e:
             print(f"❌ Error saving CSV: {e}")
+    
+    def save_graph_session(self):
+        """
+        Save graph session data to JSON file in graph_sessions/ subdirectory.
+        Uses timestamp from when graphing started.
+        """
+        if not self.graph_data or not self.graph_start_time:
+            print("No graph data to save")
+            return
+        
+        # Generate filename with session START timestamp
+        timestamp = self.graph_start_time.strftime("%Y-%m-%d_%H-%M-%S")
+        filename = f"graph_{timestamp}.json"
+        
+        # Save to graph_sessions subdirectory
+        graph_dir = Path(__file__).parent / "graph_sessions"
+        graph_dir.mkdir(exist_ok=True)
+        filepath = graph_dir / filename
+        
+        # Calculate session duration
+        duration_seconds = (datetime.now() - self.graph_start_time).total_seconds()
+        
+        # Create session metadata
+        session_data = {
+            'metadata': {
+                'start_time': self.graph_start_time.isoformat(),
+                'end_time': datetime.now().isoformat(),
+                'duration_seconds': duration_seconds,
+                'data_points': len(self.graph_data)
+            },
+            'data': self.graph_data
+        }
+        
+        try:
+            with open(filepath, 'w') as jsonfile:
+                json.dump(session_data, jsonfile, indent=2)
+            
+            print(f"✅ Saved graph session ({len(self.graph_data)} points, {duration_seconds:.1f}s) to graph_sessions/{filename}")
+        except Exception as e:
+            print(f"❌ Error saving graph session: {e}")
     
     def cleanup(self):
         """Clean up all hardware resources and save data if needed."""
@@ -340,6 +394,10 @@ class ShopHeaterController:
         # Save data to CSV if we collected any
         if self.saved_data:
             self.save_to_csv()
+        
+        # Save graph session if we collected any
+        if self.graph_data:
+            self.save_graph_session()
         
         self.fan.cleanup()
         self.flow_meter.cleanup()
@@ -352,6 +410,11 @@ controller: Optional[ShopHeaterController] = None
 
 # FastAPI app
 app = FastAPI(title="Shop Heater Control")
+
+# Mount static directories
+app.mount("/images", StaticFiles(directory="images"), name="images")
+app.mount("/data_logs", StaticFiles(directory="data_logs"), name="data_logs")
+app.mount("/graph_sessions", StaticFiles(directory="graph_sessions"), name="graph_sessions")
 
 # Connected WebSocket clients
 active_connections: list[WebSocket] = []
@@ -522,10 +585,87 @@ async def read_root():
     return FileResponse("web_ui.html")
 
 
+@app.get("/controls")
+async def read_controls():
+    """Serve the controls page."""
+    return FileResponse("controls.html")
+
+
 @app.get("/graph")
 async def read_graph():
     """Serve the graph page."""
     return FileResponse("graph.html")
+
+
+@app.get("/explorer")
+async def read_explorer():
+    """Serve the data explorer page."""
+    return FileResponse("explorer.html")
+
+
+@app.get("/api/sessions")
+async def list_sessions():
+    """List all CSV log sessions."""
+    data_dir = Path(__file__).parent / "data_logs"
+    sessions = []
+    
+    if data_dir.exists():
+        for csv_file in sorted(data_dir.glob("session_*.csv"), reverse=True):
+            stats = csv_file.stat()
+            sessions.append({
+                'filename': csv_file.name,
+                'size': stats.st_size,
+                'modified': stats.st_mtime,
+                'type': 'csv'
+            })
+    
+    return {"sessions": sessions}
+
+
+@app.get("/api/graph_sessions")
+async def list_graph_sessions():
+    """List all saved graph sessions."""
+    graph_dir = Path(__file__).parent / "graph_sessions"
+    sessions = []
+    
+    if graph_dir.exists():
+        for json_file in sorted(graph_dir.glob("graph_*.json"), reverse=True):
+            try:
+                with open(json_file, 'r') as f:
+                    data = json.load(f)
+                    metadata = data.get('metadata', {})
+                    sessions.append({
+                        'filename': json_file.name,
+                        'start_time': metadata.get('start_time'),
+                        'end_time': metadata.get('end_time'),
+                        'duration': metadata.get('duration_seconds'),
+                        'data_points': metadata.get('data_points'),
+                        'type': 'graph'
+                    })
+            except Exception as e:
+                print(f"Error reading {json_file}: {e}")
+    
+    return {"sessions": sessions}
+
+
+@app.get("/api/load_session/{filename}")
+async def load_session(filename: str):
+    """Load a specific graph session."""
+    graph_dir = Path(__file__).parent / "graph_sessions"
+    filepath = graph_dir / filename
+    
+    # Security: ensure filename doesn't contain path traversal
+    if ".." in filename or "/" in filename:
+        return {"error": "Invalid filename"}
+    
+    if not filepath.exists():
+        return {"error": "Session not found"}
+    
+    try:
+        with open(filepath, 'r') as f:
+            return json.load(f)
+    except Exception as e:
+        return {"error": str(e)}
 
 
 @app.get("/test_arrows.html")
