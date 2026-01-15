@@ -668,6 +668,58 @@ async def load_session(filename: str):
         return {"error": str(e)}
 
 
+@app.delete("/api/delete_graph_session/{filename}")
+async def delete_graph_session(filename: str):
+    """Delete a specific graph session file."""
+    graph_dir = Path(__file__).parent / "graph_sessions"
+    filepath = graph_dir / filename
+    
+    # Security: ensure filename doesn't contain path traversal
+    if ".." in filename or "/" in filename:
+        return {"success": False, "error": "Invalid filename"}
+    
+    # Ensure it's a graph file
+    if not filename.startswith("graph_") or not filename.endswith(".json"):
+        return {"success": False, "error": "Invalid file type"}
+    
+    if not filepath.exists():
+        return {"success": False, "error": "Session not found"}
+    
+    try:
+        filepath.unlink()  # Delete the file
+        print(f"🗑️ Deleted graph session: {filename}")
+        return {"success": True, "message": f"Deleted {filename}"}
+    except Exception as e:
+        print(f"❌ Error deleting graph session {filename}: {e}")
+        return {"success": False, "error": str(e)}
+
+
+@app.delete("/api/delete_csv_session/{filename}")
+async def delete_csv_session(filename: str):
+    """Delete a specific CSV data log file."""
+    data_dir = Path(__file__).parent / "data_logs"
+    filepath = data_dir / filename
+    
+    # Security: ensure filename doesn't contain path traversal
+    if ".." in filename or "/" in filename:
+        return {"success": False, "error": "Invalid filename"}
+    
+    # Ensure it's a CSV file
+    if not filename.startswith("session_") or not filename.endswith(".csv"):
+        return {"success": False, "error": "Invalid file type"}
+    
+    if not filepath.exists():
+        return {"success": False, "error": "Session not found"}
+    
+    try:
+        filepath.unlink()  # Delete the file
+        print(f"🗑️ Deleted CSV session: {filename}")
+        return {"success": True, "message": f"Deleted {filename}"}
+    except Exception as e:
+        print(f"❌ Error deleting CSV session {filename}: {e}")
+        return {"success": False, "error": str(e)}
+
+
 @app.get("/test_arrows.html")
 async def test_arrows():
     """Serve the arrow test page."""

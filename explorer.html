@@ -282,6 +282,9 @@ async function loadGraphSessions() {
             <button class="secondary" onclick="viewGraphSession('${session.filename}')">
               📊 View Graph
             </button>
+            <button class="danger" onclick="deleteGraphSession('${session.filename}')">
+              🗑️ Delete
+            </button>
           </div>
         </div>
       `;
@@ -330,6 +333,9 @@ async function loadCSVSessions() {
             <button class="secondary" onclick="downloadCSV('${session.filename}')">
               💾 Download
             </button>
+            <button class="danger" onclick="deleteCSVSession('${session.filename}')">
+              🗑️ Delete
+            </button>
           </div>
         </div>
       `;
@@ -357,6 +363,58 @@ function downloadCSV(filename) {
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+}
+
+// Delete a graph session
+async function deleteGraphSession(filename) {
+  if (!confirm(`Are you sure you want to delete "${filename}"?\n\nThis action cannot be undone.`)) {
+    return;
+  }
+  
+  try {
+    const response = await fetch(`/api/delete_graph_session/${encodeURIComponent(filename)}`, {
+      method: 'DELETE'
+    });
+    
+    const result = await response.json();
+    
+    if (result.success) {
+      alert(`✅ Deleted: ${filename}`);
+      // Reload the graph sessions list
+      loadGraphSessions();
+    } else {
+      alert(`❌ Error: ${result.error || 'Unknown error'}`);
+    }
+  } catch (error) {
+    console.error('Error deleting graph session:', error);
+    alert('❌ Failed to delete session');
+  }
+}
+
+// Delete a CSV session
+async function deleteCSVSession(filename) {
+  if (!confirm(`Are you sure you want to delete "${filename}"?\n\nThis action cannot be undone.`)) {
+    return;
+  }
+  
+  try {
+    const response = await fetch(`/api/delete_csv_session/${encodeURIComponent(filename)}`, {
+      method: 'DELETE'
+    });
+    
+    const result = await response.json();
+    
+    if (result.success) {
+      alert(`✅ Deleted: ${filename}`);
+      // Reload the CSV sessions list
+      loadCSVSessions();
+    } else {
+      alert(`❌ Error: ${result.error || 'Unknown error'}`);
+    }
+  } catch (error) {
+    console.error('Error deleting CSV session:', error);
+    alert('❌ Failed to delete session');
+  }
 }
 
 // Load both types of sessions on page load
