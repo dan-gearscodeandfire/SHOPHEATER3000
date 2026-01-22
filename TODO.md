@@ -60,6 +60,33 @@ Confirm all arrows display correct flow direction in each mode at all temperatur
 
 ---
 
+## Technical Notes / Lessons Learned
+
+### ⚠️ Arrow Image Base Orientation Issue (January 22, 2026)
+
+**The Problem:**
+When debugging arrow rotations, the CSS transforms appeared correct (`rotate(90deg)` was being applied), but blue arrows displayed differently than red arrows in the same cell.
+
+**Root Cause:**
+The 90° turn arrow image files (`256_arrow_*_90.png`) had **inconsistent base orientations**:
+- `256_arrow_red_90.png`: entered from LEFT, exited UP
+- `256_arrow_blue_90.png`: entered from BOTTOM, exited LEFT (90° different!)
+- `256_arrow_orange_90.png`: same as blue (90° different from red)
+
+**Why This Was Hard to Debug:**
+1. CSS computed transforms showed correct rotation values
+2. The issue only appeared with certain colors (blue/orange) not red
+3. Browser caching made it hard to see changes
+4. The 5-second WebSocket update delay meant state changed after page load
+
+**The Fix:**
+Rotated `256_arrow_blue_90.png` and `256_arrow_orange_90.png` by 90° CW to match red's base orientation, then adjusted CSS rotations in `web_ui.html` to compensate.
+
+**Future Prevention:**
+When creating new arrow images, **always verify all color variants have identical base orientations** by opening them side-by-side. The base image orientation (before any CSS rotation) should be documented in `ARROW_ROTATIONS.md`.
+
+---
+
 ## Completed ✅
 
 - [x] Sensor calibration with ice water test
