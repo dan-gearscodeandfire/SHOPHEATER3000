@@ -52,10 +52,10 @@ class ShopHeaterController:
         
         # Current state
         self.current_fan_speed = 0
-        self.main_loop_state = False  # False=off (HIGH), True=on (LOW)
-        self.diversion_state = False  # False=off (HIGH), True=on (LOW)
+        self.main_loop_state = True  # SAFETY: Default to OPEN - False=off (HIGH), True=on (LOW)
+        self.diversion_state = True  # SAFETY: Default to OPEN - False=off (HIGH), True=on (LOW)
         self.control_mode = 'manual'  # 'manual' or 'automatic'
-        self.flow_mode = 'main'  # 'main', 'diversion', or 'mix'
+        self.flow_mode = 'mix'  # 'main', 'diversion', or 'mix' - starts as 'mix' (both open)
         
         # Data logging and graphing state
         self.save_enabled = False
@@ -65,12 +65,16 @@ class ShopHeaterController:
         self.save_start_time = None  # Timestamp when logging started
         self.graph_start_time = None  # Timestamp when graphing started
         
-        # Set initial safe state
-        self.valve_control.all_closed()
+        # Set initial safe state - CRITICAL: Both valves must be open for circulation
+        # Never close both valves - this creates dangerous error state with no flow path
+        self.valve_control.mainLoop()  # Open main loop
+        self.valve_control.diversion_low()  # Open diversion (LOW = on/open)
         self.fan.set_speed(0)
         
-        # Calculate initial flow mode based on valve states
+        # Calculate initial flow mode based on valve states (should be 'mix')
         self.calculate_flow_mode()
+        
+        print(f"SAFETY: Both valves initialized to OPEN (flow_mode: {self.flow_mode})")
         
         print("Controller initialized successfully")
     
@@ -177,7 +181,17 @@ class ShopHeaterController:
         Set main loop solenoid state.
         True = on (GPIO LOW, relay closed, solenoid open)
         False = off (GPIO HIGH, relay open, solenoid closed)
+        
+        SAFETY: If trying to close main loop while diversion is closed,
+        automatically opens diversion to prevent both valves being closed.
         """
+        # SAFETY CHECK: Prevent both valves from being closed
+        if not state and not self.diversion_state:
+            print("⚠️  SAFETY OVERRIDE: Cannot close main loop while diversion is closed!")
+            print("    Automatically opening diversion valve to maintain flow path...")
+            self.valve_control.diversion_low()  # Force diversion open
+            self.diversion_state = True
+        
         if state:
             self.valve_control.normal_low()  # Turn on
         else:
@@ -191,7 +205,17 @@ class ShopHeaterController:
         Set diversion solenoid state.
         True = on (GPIO LOW, relay closed, solenoid open)
         False = off (GPIO HIGH, relay open, solenoid closed)
+        
+        SAFETY: If trying to close diversion while main loop is closed,
+        automatically opens main loop to prevent both valves being closed.
         """
+        # SAFETY CHECK: Prevent both valves from being closed
+        if not state and not self.main_loop_state:
+            print("⚠️  SAFETY OVERRIDE: Cannot close diversion while main loop is closed!")
+            print("    Automatically opening main loop valve to maintain flow path...")
+            self.valve_control.normal_low()  # Force main loop open
+            self.main_loop_state = True
+        
         if state:
             self.valve_control.diversion_low()  # Turn on
         else:

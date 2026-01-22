@@ -3,12 +3,36 @@
 Integrated shop heater control system combining multiple Raspberry Pi GPIO modules with real-time web interface.
 
 **Created:** January 6, 2026  
-**Last Updated:** January 15, 2026  
+**Last Updated:** January 22, 2026  
 **Status:** ✅ Production-ready with dynamic UI, data logging, and historical analysis tools
 
 ---
 
+## ⚠️ CRITICAL SAFETY REQUIREMENT
+
+**NEVER close both solenoid valves simultaneously!**
+
+- **At least ONE valve must ALWAYS be open** (Main Loop OR Diversion OR Both)
+- Closing both valves creates a dangerous error state with no circulation path
+- Can cause pump damage, pressure buildup, or system failure
+
+**System Protections:**
+- ✅ Server startup defaults to BOTH valves OPEN (safe state)
+- ✅ Automatic safety override prevents both valves from closing
+- ✅ If attempting to close one valve while the other is closed, the system automatically opens the other valve
+
+**Valid Configurations:**
+- ✅ Main Loop ON, Diversion OFF (main mode)
+- ✅ Main Loop OFF, Diversion ON (diversion mode)
+- ✅ Main Loop ON, Diversion ON (mix mode)
+- ❌ Main Loop OFF, Diversion OFF (**DANGEROUS - PREVENTED BY SYSTEM**)
+
+---
+
 ## Quick Navigation
+
+**⚠️ SAFETY FIRST:**
+- [Critical Safety Requirement](#️-critical-safety-requirement) - **READ THIS FIRST**
 
 **Getting Started:**
 - [Overview](#overview) - System overview
@@ -64,6 +88,9 @@ cd ~/SHOPHEATER3000
 source .venv/bin/activate
 python shopheater3000.py
 \`\`\`
+
+> **🔄 DEFAULT STATE:** Server starts with **BOTH valves OPEN** (mix mode) as a safety measure.  
+> This ensures water always has a circulation path. Adjust via Controls page as needed.
 
 ### 2. Access the Web UI
 
@@ -332,10 +359,30 @@ See \`example_integration.py\` for a complete working example.
   - CSV logs: `data_logs/` subdirectory
   - Graph sessions: `graph_sessions/` subdirectory (JSON)
   - Timestamped filenames for session tracking
+- **Safety Features:**
+  - **Startup Default:** Both valves OPEN (mix mode) - ensures safe circulation path
+  - **Automatic Override:** Prevents both valves from closing simultaneously
+  - **Flow Monitoring:** Real-time flow mode calculation (main/diversion/mix/none)
 
 ---
 
 ## Changelog
+
+### 2026-01-22 (Critical Safety & Arrow Corrections)
+- **⚠️ SAFETY REQUIREMENT IMPLEMENTED:**
+  - Added critical safety requirement: At least ONE valve must ALWAYS be open
+  - **Server startup defaults changed: Both valves now default to OPEN (mix mode)**
+  - Automatic safety override: Prevents both valves from closing simultaneously
+  - If attempting to close one valve while other is closed, system auto-opens the other
+- **Visual Flow Corrections:**
+  - Fixed 90° arrow base image orientations (blue and orange images rotated to match red)
+  - Corrected arrow rotations for cells 0:0, 0:1, 0:5, 3:0, 3:1, 3:5 across all flow modes
+  - All arrows now display correct flow direction in main, diversion, and mix modes
+  - Verified arrow orientation matches physical plumbing configuration
+- **Documentation:**
+  - Added prominent safety warning section in README
+  - Updated technical specifications with safety features
+  - Added safety notes to Quick Navigation
 
 ### 2026-01-15 (Data Management & UI Reorganization)
 - **UI Reorganization:**
@@ -408,5 +455,5 @@ See \`example_integration.py\` for a complete working example.
 
 ---
 
-**Last Updated:** January 15, 2026  
-**System Status:** ✅ Production-ready with full data logging, graphing, and historical analysis capabilities
+**Last Updated:** January 22, 2026  
+**System Status:** ✅ Production-ready with full data logging, graphing, historical analysis, and critical safety features

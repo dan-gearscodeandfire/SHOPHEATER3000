@@ -356,12 +356,12 @@
 <div class="grid">
 
   <!-- Row 0 -->
-  <div class="cell"><img id="arrow_0_0" src="images/256_arrow_red_90.png" style="transform: rotate(180deg);"></div>
+  <div class="cell"><img id="arrow_0_0" src="images/256_arrow_red_90.png" style="transform: rotate(90deg);"></div>
   <div class="cell"><img id="arrow_0_1" src="images/256_arrow_red_90.png" style="transform: rotate(180deg);"></div>
   <div class="cell"><img id="arrow_0_2" src="images/256_arrow_red.png" style="transform: rotate(180deg);"></div>
   <div class="cell"><img src="images/256_heater.png"></div>
   <div class="cell"><img id="arrow_0_4" src="images/256_arrow_blue.png" style="transform: rotate(180deg);"></div>
-  <div class="cell"><img id="arrow_0_5" src="images/256_arrow_blue_90.png"></div>
+  <div class="cell"><img id="arrow_0_5" src="images/256_arrow_blue_90.png" style="transform: rotate(270deg);"></div>
 
   <!-- Row 1 -->
   <div class="cell"><img id="reservoir_img" src="images/256_reservoir.png"></div>
@@ -406,7 +406,7 @@
   <div class="cell"><img id="arrow_3_2" src="images/256_arrow_red.png"></div>
   <div class="cell"><img src="images/256_radiator.png"></div>
   <div class="cell"><img id="arrow_3_4" src="images/256_arrow_blue.png"></div>
-  <div class="cell"><img id="arrow_3_5" src="images/256_arrow_blue_90.png" style="transform: rotate(90deg);"></div>
+  <div class="cell"><img id="arrow_3_5" src="images/256_arrow_blue_90.png" style="transform: rotate(0deg);"></div>
 
   <!-- Row 4 -->
   <div class="cell"></div>
@@ -581,22 +581,37 @@ function updateArrowColorOnly(elementId, color, suffix) {
 function updateArrowImage(elementId, color, suffix, transform) {
   const element = document.getElementById(elementId);
   if (element) {
+    const oldSrc = element.src;
+    const oldTransform = element.style.transform;
     element.src = `images/256_arrow_${color}${suffix}.png`;
     if (transform !== undefined) {
       element.style.transform = transform;
+    }
+    // DEBUG: Log arrow_3_0 changes
+    if (elementId === 'arrow_3_0') {
+      console.log(`🔍 arrow_3_0 UPDATE:`, {
+        color, suffix, transform,
+        oldSrc: oldSrc.split('/').pop(),
+        newSrc: element.src.split('/').pop(),
+        oldTransform,
+        newTransform: element.style.transform
+      });
     }
   }
 }
 
 // Update arrow visibility and direction based on flow mode
 function updateArrowVisibility(flowMode, temps) {
-  if (!flowMode || !temps) return;
+  if (!flowMode || !temps) {
+    console.warn('⚠️ updateArrowVisibility called with missing data:', { flowMode, temps: !!temps });
+    return;
+  }
   
   const hotColor = getArrowColor(temps.water_hot);
   const mixColor = getArrowColor(temps.water_mix);
   const reservoirColor = getArrowColor(temps.water_reservoir);
   
-  console.log(`Updating arrow visibility for flow mode: ${flowMode}`);
+  console.log(`🎯 updateArrowVisibility: flowMode=${flowMode}, reservoirColor=${reservoirColor}`);
   
   // Get all arrow cells
   const arrow_0_0 = document.getElementById('arrow_0_0');
@@ -615,7 +630,7 @@ function updateArrowVisibility(flowMode, temps) {
     // Show and configure visible arrows
     if (arrow_0_1) {
       arrow_0_1.style.visibility = 'visible';
-      updateArrowImage('arrow_0_1', hotColor, '_90', 'rotate(270deg)'); // 270° (was 90° + 180°)
+      updateArrowImage('arrow_0_1', hotColor, '_90', 'rotate(180deg)'); // 180° - enters right, exits down
     }
     if (arrow_1_1) {
       arrow_1_1.style.visibility = 'visible';
@@ -627,7 +642,7 @@ function updateArrowVisibility(flowMode, temps) {
     }
     if (arrow_3_1) {
       arrow_3_1.style.visibility = 'visible';
-      updateArrowImage('arrow_3_1', mixColor, '_90', 'rotate(180deg)'); // 180° (was 90° + 90°)
+      updateArrowImage('arrow_3_1', mixColor, '_90', 'rotate(90deg)'); // 90° - enters top, exits right
     }
     
   } else if (flowMode === 'diversion') {
@@ -643,7 +658,7 @@ function updateArrowVisibility(flowMode, temps) {
     }
     if (arrow_3_0) {
       arrow_3_0.style.visibility = 'visible';
-      updateArrowImage('arrow_3_0', reservoirColor, '_90', 'rotate(90deg)'); // 90° - uses reservoir color, same flow as mix mode
+      updateArrowImage('arrow_3_0', reservoirColor, '_90', 'rotate(90deg)'); // 90° - enters from top, exits right
     }
     if (arrow_3_1) {
       arrow_3_1.style.visibility = 'visible';
@@ -651,7 +666,7 @@ function updateArrowVisibility(flowMode, temps) {
     }
     if (arrow_0_0) {
       arrow_0_0.style.visibility = 'visible';
-      updateArrowImage('arrow_0_0', hotColor, '_90', 'rotate(270deg)'); // 270° (was 180° + 90°)
+      updateArrowImage('arrow_0_0', hotColor, '_90', 'rotate(180deg)'); // 180° - enters right, exits down
     }
     
   } else if (flowMode === 'mix') {
@@ -659,7 +674,7 @@ function updateArrowVisibility(flowMode, temps) {
     // Show all arrows, with branching arrows at 0:1 and 3:1
     if (arrow_0_0) {
       arrow_0_0.style.visibility = 'visible';
-      updateArrowImage('arrow_0_0', hotColor, '_90', 'rotate(270deg)'); // 270° (was 180° + 90°)
+      updateArrowImage('arrow_0_0', hotColor, '_90', 'rotate(180deg)'); // 180° - enters right, exits down
     }
     if (arrow_0_1) {
       arrow_0_1.style.visibility = 'visible';
@@ -675,7 +690,7 @@ function updateArrowVisibility(flowMode, temps) {
     }
     if (arrow_3_0) {
       arrow_3_0.style.visibility = 'visible';
-      updateArrowImage('arrow_3_0', reservoirColor, '_90', 'rotate(90deg)'); // 90° (CCW from previous 180°)
+      updateArrowImage('arrow_3_0', reservoirColor, '_90', 'rotate(90deg)'); // 90° - enters from top, exits right
     }
     if (arrow_3_1) {
       arrow_3_1.style.visibility = 'visible';
@@ -718,11 +733,26 @@ function updateDisplay(data) {
   // (This sets type, color, and rotation for dynamic arrows)
   if (data.flow_mode) {
     updateArrowVisibility(data.flow_mode, temps);
+  } else {
+    console.warn('⚠️ NO flow_mode in data - updateArrowVisibility NOT called!', data);
   }
+  
+  // DEBUG: Check arrow_3_0 state after visibility update
+  const arrow3_0_check = document.getElementById('arrow_3_0');
+  console.log('📍 arrow_3_0 state after updateArrowVisibility:', {
+    src: arrow3_0_check?.src?.split('/').pop(),
+    transform: arrow3_0_check?.style?.transform
+  });
   
   // Then update colors for static arrows
   // (This only updates colors, not types or rotations)
   updateArrowColors(data);
+  
+  // DEBUG: Check arrow_3_0 state after updateArrowColors
+  console.log('📍 arrow_3_0 state after updateArrowColors:', {
+    src: arrow3_0_check?.src?.split('/').pop(),
+    transform: arrow3_0_check?.style?.transform
+  });
   
   // Update deltas
   const deltas = data.deltas;
@@ -736,63 +766,72 @@ function updateDisplay(data) {
   // Update fan speed display
   updateValue('fan_speed_display', data.fan_speed, '%');
   
-  // Update control states based on mode
+  // Update control states based on mode (only if controls exist on this page)
   const mainLoopToggle = document.getElementById('mainLoopToggle');
   const diversionToggle = document.getElementById('diversionToggle');
   const fanSpeedInput = document.getElementById('fanSpeedInput');
   const fanSpeedSlider = document.getElementById('fanSpeedSlider');
   
-  // Main loop toggle - only block updates that would CHANGE the current state
-  const inIgnoreWindowMain = Date.now() < ignoreWindows.main_loop;
-  const wouldChangeMain = (mainLoopToggle.checked !== data.main_loop_state);
-  if (!inIgnoreWindowMain || !wouldChangeMain) {
-    // Accept if: outside ignore window OR update matches current state
-    if (mainLoopToggle.checked !== data.main_loop_state) {
-      mainLoopToggle.checked = data.main_loop_state;
-      document.getElementById('mainLoopLabel').textContent = data.main_loop_state ? 'ON' : 'OFF';
-      console.log(`Accepted main_loop update: ${data.main_loop_state}`);
-    }
-  } else {
-    console.log(`Blocked main_loop change from ${mainLoopToggle.checked} to ${data.main_loop_state}`);
-  }
-  
-  // Diversion toggle - only block updates that would CHANGE the current state
-  const inIgnoreWindowDiv = Date.now() < ignoreWindows.diversion;
-  const wouldChangeDiv = (diversionToggle.checked !== data.diversion_state);
-  if (!inIgnoreWindowDiv || !wouldChangeDiv) {
-    // Accept if: outside ignore window OR update matches current state
-    if (diversionToggle.checked !== data.diversion_state) {
-      diversionToggle.checked = data.diversion_state;
-      document.getElementById('diversionLabel').textContent = data.diversion_state ? 'ON' : 'OFF';
-      console.log(`Accepted diversion update: ${data.diversion_state}`);
-    }
-  } else {
-    console.log(`Blocked diversion change from ${diversionToggle.checked} to ${data.diversion_state}`);
-  }
-  
-  // Fan controls - update if not ignoring and not focused
-  if (!shouldIgnoreUpdate('fan_speed', data.fan_speed)) {
-    if (document.activeElement !== fanSpeedInput && document.activeElement !== fanSpeedSlider) {
-      fanSpeedInput.value = data.fan_speed;
-      fanSpeedSlider.value = data.fan_speed;
+  // Only update controls if they exist (they don't exist on dashboard page)
+  if (mainLoopToggle) {
+    // Main loop toggle - only block updates that would CHANGE the current state
+    const inIgnoreWindowMain = Date.now() < ignoreWindows.main_loop;
+    const wouldChangeMain = (mainLoopToggle.checked !== data.main_loop_state);
+    if (!inIgnoreWindowMain || !wouldChangeMain) {
+      // Accept if: outside ignore window OR update matches current state
+      if (mainLoopToggle.checked !== data.main_loop_state) {
+        mainLoopToggle.checked = data.main_loop_state;
+        document.getElementById('mainLoopLabel').textContent = data.main_loop_state ? 'ON' : 'OFF';
+        console.log(`Accepted main_loop update: ${data.main_loop_state}`);
+      }
+    } else {
+      console.log(`Blocked main_loop change from ${mainLoopToggle.checked} to ${data.main_loop_state}`);
     }
   }
   
-  // Update Save toggle state
+  if (diversionToggle) {
+    // Diversion toggle - only block updates that would CHANGE the current state
+    const inIgnoreWindowDiv = Date.now() < ignoreWindows.diversion;
+    const wouldChangeDiv = (diversionToggle.checked !== data.diversion_state);
+    if (!inIgnoreWindowDiv || !wouldChangeDiv) {
+      // Accept if: outside ignore window OR update matches current state
+      if (diversionToggle.checked !== data.diversion_state) {
+        diversionToggle.checked = data.diversion_state;
+        document.getElementById('diversionLabel').textContent = data.diversion_state ? 'ON' : 'OFF';
+        console.log(`Accepted diversion update: ${data.diversion_state}`);
+      }
+    } else {
+      console.log(`Blocked diversion change from ${diversionToggle.checked} to ${data.diversion_state}`);
+    }
+  }
+  
+  // Fan controls - update if not ignoring and not focused (only if controls exist)
+  if (fanSpeedInput && fanSpeedSlider) {
+    if (!shouldIgnoreUpdate('fan_speed', data.fan_speed)) {
+      if (document.activeElement !== fanSpeedInput && document.activeElement !== fanSpeedSlider) {
+        fanSpeedInput.value = data.fan_speed;
+        fanSpeedSlider.value = data.fan_speed;
+      }
+    }
+  }
+  
+  // Update Save toggle state (only if control exists)
   if (data.save_enabled !== undefined) {
     const saveToggle = document.getElementById('saveToggle');
-    if (saveToggle.checked !== data.save_enabled) {
+    if (saveToggle && saveToggle.checked !== data.save_enabled) {
       saveToggle.checked = data.save_enabled;
-      document.getElementById('saveLabel').textContent = data.save_enabled ? 'ON' : 'OFF';
+      const saveLabel = document.getElementById('saveLabel');
+      if (saveLabel) saveLabel.textContent = data.save_enabled ? 'ON' : 'OFF';
     }
   }
   
-  // Update Graph toggle state
+  // Update Graph toggle state (only if control exists)
   if (data.graph_enabled !== undefined) {
     const graphToggle = document.getElementById('graphToggle');
-    if (graphToggle.checked !== data.graph_enabled) {
+    if (graphToggle && graphToggle.checked !== data.graph_enabled) {
       graphToggle.checked = data.graph_enabled;
-      document.getElementById('graphLabel').textContent = data.graph_enabled ? 'ON' : 'OFF';
+      const graphLabel = document.getElementById('graphLabel');
+      if (graphLabel) graphLabel.textContent = data.graph_enabled ? 'ON' : 'OFF';
     }
   }
 }
