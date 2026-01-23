@@ -99,7 +99,8 @@ python shopheater3000.py
   - Controls: http://localhost:8000/controls
   - Live Graph: http://localhost:8000/graph
   - Data Explorer: http://localhost:8000/explorer
-- **From another device:** http://[raspberry-pi-ip]:8000 (and /controls, /graph, /explorer)
+  - Advanced Analysis: http://localhost:8000/advanced
+- **From another device:** http://[raspberry-pi-ip]:8000 (and /controls, /graph, /explorer, /advanced)
 
 ---
 
@@ -161,6 +162,27 @@ python shopheater3000.py
 - Graph sessions stored in `graph_sessions/` subdirectory
 - Independent Save and Graph functionality
 - In-memory data collection, saved on server shutdown or manual save
+
+### Advanced Analysis Page
+**Correlation & Visualization Tool:**
+- Load historical CSV sessions or stream live data
+- Configurable X/Y axes - plot any parameter against any other
+- Multi-series support - overlay multiple Y-axis parameters
+- Scatter plots (X = parameter) or time series (X = time)
+
+**Filters:**
+- Fan speed range (min/max)
+- Flow mode selection (main, diversion, mix, none)
+
+**Analysis Features:**
+- Linear regression trendlines with R² correlation coefficient
+- Toggle between all data points or averaged values
+- Export filtered data as new CSV file
+
+**Example Use Cases:**
+- Fan Speed vs Delta Radiator: "How does fan speed affect heat transfer?"
+- Delta Heater vs Delta Radiator (filtered by fan speed): "At 50% fan, how does heater input relate to output?"
+- Time vs Multiple Temperatures: "How do all temps change over a session?"
 
 See [UI_REORGANIZATION.md](UI_REORGANIZATION.md) for detailed architecture documentation.
 
