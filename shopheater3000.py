@@ -627,6 +627,12 @@ async def read_explorer():
     return FileResponse("explorer.html")
 
 
+@app.get("/advanced")
+async def read_advanced():
+    """Serve the advanced analysis page."""
+    return FileResponse("advanced.html")
+
+
 @app.get("/api/sessions")
 async def list_sessions():
     """List all CSV log sessions."""
@@ -644,6 +650,43 @@ async def list_sessions():
             })
     
     return {"sessions": sessions}
+
+
+@app.get("/api/session_data/{filename}")
+async def get_session_data(filename: str):
+    """Get full data from a CSV session file as JSON."""
+    data_dir = Path(__file__).parent / "data_logs"
+    filepath = data_dir / filename
+    
+    # Security: ensure filename is safe
+    if not filename.startswith("session_") or not filename.endswith(".csv"):
+        return {"error": "Invalid filename format"}
+    
+    if not filepath.exists():
+        return {"error": "Session not found"}
+    
+    try:
+        data = []
+        with open(filepath, 'r') as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                # Convert numeric strings to floats where applicable
+                converted = {}
+                for key, value in row.items():
+                    if key == 'timestamp':
+                        converted[key] = value
+                    elif value.lower() in ('true', 'false'):
+                        converted[key] = value.lower() == 'true'
+                    else:
+                        try:
+                            converted[key] = float(value)
+                        except (ValueError, TypeError):
+                            converted[key] = value
+                data.append(converted)
+        
+        return {"data": data, "count": len(data)}
+    except Exception as e:
+        return {"error": str(e)}
 
 
 @app.get("/api/graph_sessions")

@@ -155,9 +155,15 @@
 <body>
 
 <div class="container">
-  <a href="/" class="back-link">← Back to Dashboard</a>
-  
   <h1 id="pageTitle">📊 Shop Heater - Live Graph</h1>
+  
+  <div class="nav-links" style="display: flex; justify-content: center; gap: 15px; margin-bottom: 20px; flex-wrap: wrap;">
+    <a href="/" style="color: #fff; text-decoration: none; padding: 8px 16px; background: rgba(255, 255, 255, 0.1); border-radius: 4px;">Dashboard</a>
+    <a href="/controls" style="color: #fff; text-decoration: none; padding: 8px 16px; background: rgba(255, 255, 255, 0.1); border-radius: 4px;">Controls</a>
+    <a href="/graph" style="color: #fff; text-decoration: none; padding: 8px 16px; background: #4CAF50; border-radius: 4px;">Live Graph</a>
+    <a href="/explorer" style="color: #fff; text-decoration: none; padding: 8px 16px; background: rgba(255, 255, 255, 0.1); border-radius: 4px;">Data Explorer</a>
+    <a href="/advanced" style="color: #fff; text-decoration: none; padding: 8px 16px; background: rgba(255, 255, 255, 0.1); border-radius: 4px;">Advanced</a>
+  </div>
   
   <div class="status" id="statusContainer">
     <span id="statusIndicator" class="status-indicator status-disconnected"></span>

@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shop Heater - Advanced Analysis</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      color: #fff;
+      padding: 20px;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 10px;
+      font-size: 32px;
+    }
+
+    .nav-links {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .nav-links a {
+      color: #fff;
+      text-decoration: none;
+      padding: 8px 16px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+      transition: background 0.3s;
+    }
+
+    .nav-links a:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .nav-links a.active {
+      background: #9C27B0;
+    }
+
+    .section {
+      background: rgba(0, 0, 0, 0.4);
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    }
+
+    .section-title {
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #9C27B0;
+      margin-bottom: 15px;
+      font-weight: bold;
+    }
+
+    .controls-row {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      align-items: flex-start;
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .control-group label {
+      font-size: 13px;
+      color: #aaa;
+    }
+
+    select, input[type="number"], input[type="text"] {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #fff;
+      padding: 10px 15px;
+      border-radius: 4px;
+      font-size: 14px;
+      min-width: 180px;
+    }
+
+    select:focus, input:focus {
+      outline: none;
+      border-color: #9C27B0;
+    }
+
+    .checkbox-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      max-width: 600px;
+    }
+
+    .checkbox-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(255, 255, 255, 0.05);
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .checkbox-item:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .checkbox-item input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+    }
+
+    .checkbox-item label {
+      font-size: 13px;
+      cursor: pointer;
+      color: #ddd;
+    }
+
+    .radio-group {
+      display: flex;
+      gap: 20px;
+    }
+
+    .radio-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+
+    .radio-item input[type="radio"] {
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+    }
+
+    .chart-container {
+      position: relative;
+      height: 500px;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 8px;
+      padding: 20px;
+    }
+
+    .stats-bar {
+      display: flex;
+      gap: 30px;
+      padding: 15px 20px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 4px;
+      margin-top: 15px;
+      flex-wrap: wrap;
+    }
+
+    .stat-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      color: #888;
+    }
+
+    .stat-value {
+      font-size: 18px;
+      font-weight: bold;
+      color: #4CAF50;
+    }
+
+    .button-row {
+      display: flex;
+      gap: 15px;
+      margin-top: 20px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      background: #9C27B0;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: bold;
+      transition: background 0.3s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    button:hover {
+      background: #7B1FA2;
+    }
+
+    button.secondary {
+      background: #2196F3;
+    }
+
+    button.secondary:hover {
+      background: #1976D2;
+    }
+
+    button.success {
+      background: #4CAF50;
+    }
+
+    button.success:hover {
+      background: #388E3C;
+    }
+
+    button:disabled {
+      background: #555;
+      cursor: not-allowed;
+    }
+
+    .status-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+      font-size: 14px;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #888;
+    }
+
+    .status-dot.connected {
+      background: #4CAF50;
+      animation: pulse 2s infinite;
+    }
+
+    .status-dot.loading {
+      background: #FF9800;
+      animation: pulse 0.5s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .filter-section {
+      display: flex;
+      gap: 30px;
+      flex-wrap: wrap;
+      align-items: flex-end;
+    }
+
+    .range-filter {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .range-filter input[type="range"] {
+      width: 150px;
+    }
+
+    .range-value {
+      min-width: 50px;
+      text-align: center;
+      font-weight: bold;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #888;
+    }
+
+    .empty-state h3 {
+      margin-bottom: 10px;
+      color: #aaa;
+    }
+
+    /* Color coding for Y-axis series */
+    .series-color {
+      width: 12px;
+      height: 12px;
+      border-radius: 2px;
+      display: inline-block;
+      margin-right: 6px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>🔬 Advanced Analysis</h1>
+  
+  <div class="nav-links">
+    <a href="/">Dashboard</a>
+    <a href="/controls">Controls</a>
+    <a href="/graph">Live Graph</a>
+    <a href="/explorer">Data Explorer</a>
+    <a href="/advanced" class="active">Advanced</a>
+  </div>
+
+  <!-- Data Source Section -->
+  <div class="section">
+    <div class="section-title">Data Source</div>
+    <div class="controls-row">
+      <div class="radio-group">
+        <div class="radio-item">
+          <input type="radio" id="sourceLive" name="dataSource" value="live">
+          <label for="sourceLive">Live Data</label>
+        </div>
+        <div class="radio-item">
+          <input type="radio" id="sourceSession" name="dataSource" value="session" checked>
+          <label for="sourceSession">Load Session</label>
+        </div>
+      </div>
+      <div class="control-group">
+        <select id="sessionSelect">
+          <option value="">-- Select a session --</option>
+        </select>
+      </div>
+      <div class="status-indicator">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusText">No data loaded</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Axis Configuration Section -->
+  <div class="section">
+    <div class="section-title">Axis Configuration</div>
+    <div class="controls-row">
+      <div class="control-group">
+        <label>X-Axis</label>
+        <select id="xAxisSelect">
+          <option value="timestamp" selected>Time</option>
+          <option value="fan_speed">Fan Speed</option>
+          <option value="flow_rate">Flow Rate</option>
+          <option value="water_hot">Water Hot</option>
+          <option value="water_reservoir">Water Reservoir</option>
+          <option value="water_mix">Water Mix</option>
+          <option value="water_cold">Water Cold</option>
+          <option value="air_cool">Air Cool</option>
+          <option value="air_heated">Air Heated</option>
+          <option value="delta_water_heater">Delta Heater</option>
+          <option value="delta_water_radiator">Delta Radiator</option>
+          <option value="delta_air">Delta Air</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <label>Y-Axis (select multiple)</label>
+        <div class="checkbox-group" id="yAxisCheckboxes">
+          <div class="checkbox-item">
+            <input type="checkbox" id="y_delta_water_radiator" value="delta_water_radiator" checked>
+            <label for="y_delta_water_radiator">Delta Radiator</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" id="y_delta_water_heater" value="delta_water_heater">
+            <label for="y_delta_water_heater">Delta Heater</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" id="y_delta_air" value="delta_air">
+            <label for="y_delta_air">Delta Air</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" id="y_water_hot" value="water_hot">
+            <label for="y_water_hot">Water Hot</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" id="y_water_mix" value="water_mix">
+            <label for="y_water_mix">Water Mix</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" id="y_water_cold" value="water_cold">
+            <label for="y_water_cold">Water Cold</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" id="y_water_reservoir" value="water_reservoir">
+            <label for="y_water_reservoir">Water Reservoir</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" id="y_air_cool" value="air_cool">
+            <label for="y_air_cool">Air Cool</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" id="y_air_heated" value="air_heated">
+            <label for="y_air_heated">Air Heated</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" id="y_fan_speed" value="fan_speed">
+            <label for="y_fan_speed">Fan Speed</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" id="y_flow_rate" value="flow_rate">
+            <label for="y_flow_rate">Flow Rate</label>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filters Section -->
+  <div class="section">
+    <div class="section-title">Filters</div>
+    <div class="filter-section">
+      <div class="control-group">
+        <label>Fan Speed Range</label>
+        <div class="range-filter">
+          <input type="number" id="fanSpeedMin" value="0" min="0" max="100" style="width: 70px;">
+          <span>to</span>
+          <input type="number" id="fanSpeedMax" value="100" min="0" max="100" style="width: 70px;">
+        </div>
+      </div>
+      <div class="control-group">
+        <label>Flow Mode</label>
+        <div class="checkbox-group">
+          <div class="checkbox-item">
+            <input type="checkbox" id="filter_main" value="main" checked>
+            <label for="filter_main">Main</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" id="filter_diversion" value="diversion" checked>
+            <label for="filter_diversion">Diversion</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" id="filter_mix" value="mix" checked>
+            <label for="filter_mix">Mix</label>
+          </div>
+          <div class="checkbox-item">
+            <input type="checkbox" id="filter_none" value="none" checked>
+            <label for="filter_none">None</label>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Display Options Section -->
+  <div class="section">
+    <div class="section-title">Display Options</div>
+    <div class="controls-row">
+      <div class="checkbox-item">
+        <input type="checkbox" id="showTrendline" checked>
+        <label for="showTrendline">Show Trendline</label>
+      </div>
+      <div class="radio-group">
+        <div class="radio-item">
+          <input type="radio" id="displayAll" name="displayMode" value="all" checked>
+          <label for="displayAll">Show All Points</label>
+        </div>
+        <div class="radio-item">
+          <input type="radio" id="displayAvg" name="displayMode" value="average">
+          <label for="displayAvg">Show Averages</label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chart Section -->
+  <div class="section">
+    <div class="chart-container">
+      <canvas id="analysisChart"></canvas>
+    </div>
+    <div class="stats-bar" id="statsBar">
+      <div class="stat-item">
+        <span class="stat-label">Data Points</span>
+        <span class="stat-value" id="statPoints">--</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">X Range</span>
+        <span class="stat-value" id="statXRange">--</span>
+      </div>
+      <div class="stat-item" id="trendlineStats" style="display: none;">
+        <span class="stat-label">R² (Correlation)</span>
+        <span class="stat-value" id="statR2">--</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Action Buttons -->
+  <div class="button-row">
+    <button class="success" onclick="updateChart()">
+      📊 Update Chart
+    </button>
+    <button class="secondary" onclick="exportFiltered()">
+      💾 Export Filtered CSV
+    </button>
+    <button onclick="resetFilters()">
+      🔄 Reset Filters
+    </button>
+  </div>
+</div>
+
+<script>
+// Global state
+let rawData = [];
+let filteredData = [];
+let chart = null;
+let ws = null;
+let liveMode = false;
+
+// Series colors
+const seriesColors = {
+  delta_water_radiator: '#4CAF50',
+  delta_water_heater: '#FF5722',
+  delta_air: '#2196F3',
+  water_hot: '#f44336',
+  water_mix: '#FF9800',
+  water_cold: '#03A9F4',
+  water_reservoir: '#9C27B0',
+  air_cool: '#00BCD4',
+  air_heated: '#E91E63',
+  fan_speed: '#FFC107',
+  flow_rate: '#8BC34A'
+};
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', () => {
+  loadSessionList();
+  initChart();
+  
+  // Event listeners
+  document.querySelectorAll('input[name="dataSource"]').forEach(radio => {
+    radio.addEventListener('change', handleDataSourceChange);
+  });
+  
+  document.getElementById('sessionSelect').addEventListener('change', loadSessionData);
+});
+
+// Load available sessions
+async function loadSessionList() {
+  try {
+    const response = await fetch('/api/sessions');
+    const data = await response.json();
+    
+    const select = document.getElementById('sessionSelect');
+    select.innerHTML = '<option value="">-- Select a session --</option>';
+    
+    data.sessions.forEach(session => {
+      const option = document.createElement('option');
+      option.value = session.filename;
+      option.textContent = session.filename;
+      select.appendChild(option);
+    });
+  } catch (error) {
+    console.error('Error loading sessions:', error);
+  }
+}
+
+// Handle data source change
+function handleDataSourceChange(e) {
+  const isLive = e.target.value === 'live';
+  document.getElementById('sessionSelect').disabled = isLive;
+  
+  if (isLive) {
+    startLiveMode();
+  } else {
+    stopLiveMode();
+  }
+}
+
+// Start live data mode
+function startLiveMode() {
+  liveMode = true;
+  rawData = [];
+  
+  const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  ws = new WebSocket(`${wsProtocol}//${window.location.host}/ws`);
+  
+  ws.onopen = () => {
+    setStatus('connected', 'Live - Collecting data...');
+  };
+  
+  ws.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      
+      // Convert to flat data point
+      const point = {
+        timestamp: new Date().toISOString(),
+        water_hot: data.temperatures?.water_hot,
+        water_reservoir: data.temperatures?.water_reservoir,
+        water_mix: data.temperatures?.water_mix,
+        water_cold: data.temperatures?.water_cold,
+        air_cool: data.temperatures?.air_cool,
+        air_heated: data.temperatures?.air_heated,
+        delta_water_heater: data.deltas?.water_heater,
+        delta_water_radiator: data.deltas?.water_radiator,
+        delta_air: data.deltas?.air,
+        flow_rate: data.flow_rate,
+        fan_speed: data.fan_speed,
+        flow_mode: data.flow_mode || 'none'
+      };
+      
+      rawData.push(point);
+      setStatus('connected', `Live - ${rawData.length} points`);
+      
+      // Auto-update chart every 10 points
+      if (rawData.length % 10 === 0) {
+        updateChart();
+      }
+    } catch (error) {
+      console.error('Error parsing live data:', error);
+    }
+  };
+  
+  ws.onclose = () => {
+    setStatus('', 'Disconnected');
+    liveMode = false;
+  };
+}
+
+// Stop live data mode
+function stopLiveMode() {
+  liveMode = false;
+  if (ws) {
+    ws.close();
+    ws = null;
+  }
+  setStatus('', 'No data loaded');
+}
+
+// Load session data
+async function loadSessionData() {
+  const filename = document.getElementById('sessionSelect').value;
+  if (!filename) return;
+  
+  setStatus('loading', 'Loading...');
+  
+  try {
+    const response = await fetch(`/api/session_data/${encodeURIComponent(filename)}`);
+    const data = await response.json();
+    
+    if (data.error) {
+      setStatus('', `Error: ${data.error}`);
+      return;
+    }
+    
+    rawData = data.data;
+    setStatus('connected', `Loaded ${rawData.length} points`);
+    updateChart();
+  } catch (error) {
+    console.error('Error loading session:', error);
+    setStatus('', 'Error loading session');
+  }
+}
+
+// Set status indicator
+function setStatus(state, text) {
+  const dot = document.getElementById('statusDot');
+  const statusText = document.getElementById('statusText');
+  
+  dot.className = 'status-dot ' + state;
+  statusText.textContent = text;
+}
+
+// Initialize Chart.js
+function initChart() {
+  const ctx = document.getElementById('analysisChart').getContext('2d');
+  
+  chart = new Chart(ctx, {
+    type: 'scatter',
+    data: {
+      datasets: []
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'top',
+          labels: { color: '#fff' }
+        },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              return `${context.dataset.label}: (${context.parsed.x.toFixed(2)}, ${context.parsed.y.toFixed(2)})`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          title: {
+            display: true,
+            text: 'Time',
+            color: '#fff'
+          },
+          ticks: { color: '#aaa' },
+          grid: { color: 'rgba(255,255,255,0.1)' }
+        },
+        y: {
+          title: {
+            display: true,
+            text: 'Value',
+            color: '#fff'
+          },
+          ticks: { color: '#aaa' },
+          grid: { color: 'rgba(255,255,255,0.1)' }
+        }
+      }
+    }
+  });
+}
+
+// Apply filters to data
+function applyFilters() {
+  const fanMin = parseFloat(document.getElementById('fanSpeedMin').value) || 0;
+  const fanMax = parseFloat(document.getElementById('fanSpeedMax').value) || 100;
+  
+  const allowedModes = [];
+  if (document.getElementById('filter_main').checked) allowedModes.push('main');
+  if (document.getElementById('filter_diversion').checked) allowedModes.push('diversion');
+  if (document.getElementById('filter_mix').checked) allowedModes.push('mix');
+  if (document.getElementById('filter_none').checked) allowedModes.push('none');
+  
+  filteredData = rawData.filter(point => {
+    const fanOk = point.fan_speed >= fanMin && point.fan_speed <= fanMax;
+    const modeOk = allowedModes.includes(point.flow_mode);
+    return fanOk && modeOk;
+  });
+  
+  return filteredData;
+}
+
+// Calculate linear regression
+function linearRegression(points) {
+  const n = points.length;
+  if (n < 2) return null;
+  
+  let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0, sumY2 = 0;
+  
+  points.forEach(p => {
+    sumX += p.x;
+    sumY += p.y;
+    sumXY += p.x * p.y;
+    sumX2 += p.x * p.x;
+    sumY2 += p.y * p.y;
+  });
+  
+  const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+  const intercept = (sumY - slope * sumX) / n;
+  
+  // Calculate R²
+  const yMean = sumY / n;
+  let ssTotal = 0, ssResidual = 0;
+  points.forEach(p => {
+    ssTotal += Math.pow(p.y - yMean, 2);
+    const predicted = slope * p.x + intercept;
+    ssResidual += Math.pow(p.y - predicted, 2);
+  });
+  
+  const r2 = 1 - (ssResidual / ssTotal);
+  
+  return { slope, intercept, r2 };
+}
+
+// Update the chart
+function updateChart() {
+  const data = applyFilters();
+  if (data.length === 0) {
+    document.getElementById('statPoints').textContent = '0';
+    return;
+  }
+  
+  const xAxis = document.getElementById('xAxisSelect').value;
+  const showTrendline = document.getElementById('showTrendline').checked;
+  const displayMode = document.querySelector('input[name="displayMode"]:checked').value;
+  
+  // Get selected Y axes
+  const yAxes = [];
+  document.querySelectorAll('#yAxisCheckboxes input[type="checkbox"]:checked').forEach(cb => {
+    yAxes.push(cb.value);
+  });
+  
+  if (yAxes.length === 0) {
+    alert('Please select at least one Y-axis parameter');
+    return;
+  }
+  
+  // Prepare datasets
+  const datasets = [];
+  let allR2 = [];
+  
+  yAxes.forEach(yAxis => {
+    let points = [];
+    
+    if (xAxis === 'timestamp') {
+      // Time-based X axis
+      const startTime = new Date(data[0].timestamp).getTime();
+      points = data.map(d => ({
+        x: (new Date(d.timestamp).getTime() - startTime) / 1000, // seconds from start
+        y: parseFloat(d[yAxis]) || 0
+      }));
+    } else {
+      // Parameter-based X axis
+      points = data.map(d => ({
+        x: parseFloat(d[xAxis]) || 0,
+        y: parseFloat(d[yAxis]) || 0
+      })).filter(p => !isNaN(p.x) && !isNaN(p.y));
+    }
+    
+    // Apply averaging if selected and X is not time
+    if (displayMode === 'average' && xAxis !== 'timestamp') {
+      const grouped = {};
+      points.forEach(p => {
+        const key = p.x.toFixed(1);
+        if (!grouped[key]) grouped[key] = [];
+        grouped[key].push(p.y);
+      });
+      
+      points = Object.entries(grouped).map(([x, ys]) => ({
+        x: parseFloat(x),
+        y: ys.reduce((a, b) => a + b, 0) / ys.length
+      }));
+    }
+    
+    // Main data series
+    datasets.push({
+      label: yAxis.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+      data: points,
+      backgroundColor: seriesColors[yAxis] + '80',
+      borderColor: seriesColors[yAxis],
+      pointRadius: xAxis === 'timestamp' ? 2 : 4,
+      showLine: xAxis === 'timestamp',
+      fill: false
+    });
+    
+    // Trendline
+    if (showTrendline && points.length >= 2) {
+      const regression = linearRegression(points);
+      if (regression && !isNaN(regression.slope)) {
+        const xMin = Math.min(...points.map(p => p.x));
+        const xMax = Math.max(...points.map(p => p.x));
+        
+        datasets.push({
+          label: `${yAxis} trendline (R²=${regression.r2.toFixed(3)})`,
+          data: [
+            { x: xMin, y: regression.slope * xMin + regression.intercept },
+            { x: xMax, y: regression.slope * xMax + regression.intercept }
+          ],
+          borderColor: seriesColors[yAxis],
+          borderWidth: 2,
+          borderDash: [5, 5],
+          pointRadius: 0,
+          showLine: true,
+          fill: false
+        });
+        
+        allR2.push({ axis: yAxis, r2: regression.r2 });
+      }
+    }
+  });
+  
+  // Update chart
+  chart.data.datasets = datasets;
+  chart.options.scales.x.title.text = xAxis === 'timestamp' ? 'Time (seconds)' : xAxis.replace(/_/g, ' ');
+  chart.update();
+  
+  // Update stats
+  document.getElementById('statPoints').textContent = data.length;
+  
+  if (xAxis !== 'timestamp') {
+    const xValues = data.map(d => parseFloat(d[xAxis])).filter(v => !isNaN(v));
+    const xMin = Math.min(...xValues).toFixed(1);
+    const xMax = Math.max(...xValues).toFixed(1);
+    document.getElementById('statXRange').textContent = `${xMin} - ${xMax}`;
+  } else {
+    const duration = (new Date(data[data.length - 1].timestamp) - new Date(data[0].timestamp)) / 1000;
+    document.getElementById('statXRange').textContent = `${duration.toFixed(0)}s`;
+  }
+  
+  // Show R² stats
+  if (allR2.length > 0) {
+    document.getElementById('trendlineStats').style.display = 'block';
+    const avgR2 = allR2.reduce((sum, r) => sum + r.r2, 0) / allR2.length;
+    document.getElementById('statR2').textContent = avgR2.toFixed(3);
+  } else {
+    document.getElementById('trendlineStats').style.display = 'none';
+  }
+}
+
+// Export filtered data
+async function exportFiltered() {
+  if (filteredData.length === 0) {
+    alert('No data to export. Load a session first.');
+    return;
+  }
+  
+  // Create CSV content
+  const headers = Object.keys(filteredData[0]);
+  const csvContent = [
+    headers.join(','),
+    ...filteredData.map(row => headers.map(h => row[h]).join(','))
+  ].join('\n');
+  
+  // Download
+  const blob = new Blob([csvContent], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `analysis_export_${new Date().toISOString().replace(/[:.]/g, '-')}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// Reset filters
+function resetFilters() {
+  document.getElementById('fanSpeedMin').value = 0;
+  document.getElementById('fanSpeedMax').value = 100;
+  document.getElementById('filter_main').checked = true;
+  document.getElementById('filter_diversion').checked = true;
+  document.getElementById('filter_mix').checked = true;
+  document.getElementById('filter_none').checked = true;
+  document.getElementById('showTrendline').checked = true;
+  document.getElementById('displayAll').checked = true;
+  
+  if (rawData.length > 0) {
+    updateChart();
+  }
+}
+</script>
+
+</body>
+</html>
