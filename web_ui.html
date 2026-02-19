@@ -420,7 +420,7 @@
     <img src="images/256_fans.png">
     <div class="label" style="font-size:10px; margin-top:5px;">
       <div class="value delta-value" id="delta_air">--</div>
-      <div class="value" id="fan_speed_display" style="font-size:11px; color:#ff8844;">--</div>
+      <div class="value delta-value" id="fan_speed_display" style="color:#ff8844;">--</div>
     </div>
   </div>
   <div class="cell"><img src="images/256_arrow_red.png"></div>
@@ -570,15 +570,26 @@ function updateArrowColors(data) {
 }
 
 // Helper to update ONLY the arrow color, preserving rotation
+// Orange _90 arrows in specific cells have a different base orientation and
+// need a 90° CCW correction to match the red/blue versions.
+const staticOrange90BaseRotation = { arrow_0_5: 270, arrow_3_5: 0 };
+
 function updateArrowColorOnly(elementId, color, suffix) {
   const element = document.getElementById(elementId);
   if (element) {
     element.src = `images/256_arrow_${color}${suffix}.png`;
-    // Do NOT touch transform - that's handled by updateArrowVisibility()
+    if (suffix === '_90' && elementId in staticOrange90BaseRotation) {
+      const base = staticOrange90BaseRotation[elementId];
+      const deg = color === 'orange' ? base - 90 : base;
+      element.style.transform = `rotate(${deg}deg)`;
+    }
   }
 }
 
 // Helper to update an arrow image source AND rotation
+// Orange _90 arrows need 90° CCW correction in dynamic cells.
+const dynamicOrange90Cells = ['arrow_0_1', 'arrow_3_0', 'arrow_3_1'];
+
 function updateArrowImage(elementId, color, suffix, transform) {
   const element = document.getElementById(elementId);
   if (element) {
@@ -586,9 +597,14 @@ function updateArrowImage(elementId, color, suffix, transform) {
     const oldTransform = element.style.transform;
     element.src = `images/256_arrow_${color}${suffix}.png`;
     if (transform !== undefined) {
+      if (color === 'orange' && suffix === '_90' && dynamicOrange90Cells.includes(elementId)) {
+        const match = transform.match(/rotate\((-?\d+)deg\)/);
+        if (match) {
+          transform = `rotate(${parseInt(match[1]) - 90}deg)`;
+        }
+      }
       element.style.transform = transform;
     }
-    // DEBUG: Log arrow_3_0 changes
     if (elementId === 'arrow_3_0') {
       console.log(`🔍 arrow_3_0 UPDATE:`, {
         color, suffix, transform,

@@ -804,11 +804,40 @@ async def get_image(filename: str):
 
 if __name__ == "__main__":
     import uvicorn
+    import socket
+    
+    # Get local IP address for LAN access
+    def get_local_ip():
+        try:
+            # Connect to a remote address to determine local IP
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            ip = s.getsockname()[0]
+            s.close()
+            return ip
+        except Exception:
+            return "localhost"
+    
+    local_ip = get_local_ip()
     
     print("=" * 60)
     print("Shop Heater Web Server")
     print("=" * 60)
-    print("Starting server on http://0.0.0.0:8000")
+    print("Starting server...")
+    print("")
+    print("Access from this device:")
+    print(f"  http://localhost:8000")
+    print("")
+    print("Access from other devices on your network:")
+    print(f"  http://{local_ip}:8000")
+    print("")
+    print("Available pages:")
+    print("  - Dashboard:  /")
+    print("  - Controls:   /controls")
+    print("  - Live Graph: /graph")
+    print("  - Explorer:   /explorer")
+    print("  - Advanced:   /advanced")
+    print("")
     print("Press Ctrl+C to stop")
     print("=" * 60)
     

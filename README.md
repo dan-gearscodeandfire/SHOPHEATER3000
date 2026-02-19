@@ -94,13 +94,22 @@ python shopheater3000.py
 
 ### 2. Access the Web UI
 
-- **On the Raspberry Pi:**
-  - Dashboard: http://localhost:8000
-  - Controls: http://localhost:8000/controls
-  - Live Graph: http://localhost:8000/graph
-  - Data Explorer: http://localhost:8000/explorer
-  - Advanced Analysis: http://localhost:8000/advanced
-- **From another device:** http://[raspberry-pi-ip]:8000 (and /controls, /graph, /explorer, /advanced)
+The server automatically binds to all network interfaces (`0.0.0.0`), making it accessible from any device on your local network.
+
+**On the Raspberry Pi:**
+- Dashboard: http://localhost:8000
+- Controls: http://localhost:8000/controls
+- Live Graph: http://localhost:8000/graph
+- Data Explorer: http://localhost:8000/explorer
+- Advanced Analysis: http://localhost:8000/advanced
+
+**From other devices on your LAN:**
+- Find your Pi's IP address (shown in server startup message, or run `hostname -I`)
+- Access: http://[raspberry-pi-ip]:8000
+- Example: http://192.168.1.168:8000
+- All pages work the same: `/controls`, `/graph`, `/explorer`, `/advanced`
+
+**Note:** The server startup message will display both localhost and LAN IP addresses for easy access.
 
 ---
 
