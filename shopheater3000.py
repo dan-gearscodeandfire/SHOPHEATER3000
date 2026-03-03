@@ -16,7 +16,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 # Import hardware controllers
-from bts7960_controller import BTS7960Controller
+from fan_relay_controller import FanRelayController
 from ds18b20_reader import DS18B20Reader
 from flowmeter import FlowMeter
 from relay_control import RelayController
@@ -41,7 +41,7 @@ class ShopHeaterController:
         print("Initializing Shop Heater Controller...")
         
         # Initialize hardware
-        self.fan = BTS7960Controller(rpwm_pin=18, pwm_freq=10000)
+        self.fan = FanRelayController(fan_onoff_pin=18, voltage_select_pin=17)
         self.temp_reader = DS18B20Reader()
         self.flow_meter = FlowMeter(gpio_pin=27)
         self.valve_control = RelayController()
@@ -51,7 +51,8 @@ class ShopHeaterController:
         self.sensor_map = self._initialize_sensor_map()
         
         # Current state
-        self.current_fan_speed = 0
+        self.current_fan_mode = "12v"
+        self.current_fan_voltage = self._fan_mode_to_voltage(self.current_fan_mode)
         self.main_loop_state = True  # SAFETY: Default to OPEN - False=off (HIGH), True=on (LOW)
         self.diversion_state = True  # SAFETY: Default to OPEN - False=off (HIGH), True=on (LOW)
         self.control_mode = 'manual'  # 'manual' or 'automatic'
@@ -69,7 +70,7 @@ class ShopHeaterController:
         # Never close both valves - this creates dangerous error state with no flow path
         self.valve_control.mainLoop()  # Open main loop
         self.valve_control.diversion_low()  # Open diversion (LOW = on/open)
-        self.fan.set_speed(0)
+        self.fan.set_mode("12v")
         
         # Calculate initial flow mode based on valve states (should be 'mix')
         self.calculate_flow_mode()
@@ -158,7 +159,8 @@ class ShopHeaterController:
                 'delta_air': delta_air
             },
             'flow_rate': flow_rate,
-            'fan_speed': self.current_fan_speed,
+            'fan_voltage': self.current_fan_voltage,
+            'fan_mode': self.current_fan_mode,
             'main_loop_state': self.main_loop_state,
             'diversion_state': self.diversion_state,
             'control_mode': self.control_mode,
@@ -169,12 +171,33 @@ class ShopHeaterController:
         
         return data
     
+    def _fan_mode_to_voltage(self, mode: str) -> int:
+        """Map fan relay mode to numeric voltage for graphing/logging."""
+        if mode == "off":
+            return 0
+        if mode == "5v":
+            return 5
+        return 12
+
+    def set_fan_mode(self, mode: str):
+        """Set fan mode: 'off', '5v', or '12v'."""
+        normalized = self.fan.set_mode(mode)
+        self.current_fan_mode = normalized
+        self.current_fan_voltage = self._fan_mode_to_voltage(normalized)
+        print(f"Fan mode set to {normalized.upper()} ({self.current_fan_voltage}V)")
+
     def set_fan_speed(self, speed: int):
-        """Set fan speed (0-100)."""
-        speed = max(0, min(100, speed))  # Clamp to 0-100
-        self.fan.set_speed(speed)
-        self.current_fan_speed = speed
-        print(f"Fan speed set to {speed}%")
+        """
+        Legacy compatibility: map percentage commands to relay modes.
+        <=0 => off, 1-71 => 5v, >71 => 12v
+        """
+        speed = max(0, min(100, speed))
+        if speed <= 0:
+            self.set_fan_mode("off")
+        elif speed <= 71:
+            self.set_fan_mode("5v")
+        else:
+            self.set_fan_mode("12v")
     
     def set_main_loop(self, state: bool):
         """
@@ -320,7 +343,8 @@ class ShopHeaterController:
             'delta_air': data['deltas']['delta_air'],
             # Other data
             'flow_rate': data['flow_rate'],
-            'fan_speed': data['fan_speed'],
+            'fan_voltage': data['fan_voltage'],
+            'fan_mode': data['fan_mode'],
             'main_loop_state': data['main_loop_state'],
             'diversion_state': data['diversion_state'],
             'control_mode': data['control_mode'],
@@ -357,7 +381,7 @@ class ShopHeaterController:
             'timestamp', 
             'water_hot', 'water_reservoir', 'water_mix', 'water_cold', 'air_cool', 'air_heated',
             'delta_water_heater', 'delta_water_radiator', 'delta_air',
-            'flow_rate', 'fan_speed', 'main_loop_state', 'diversion_state', 
+            'flow_rate', 'fan_voltage', 'fan_mode', 'main_loop_state', 'diversion_state',
             'control_mode', 'flow_mode'
         ]
         
@@ -570,6 +594,9 @@ async def websocket_endpoint(websocket: WebSocket):
             if controller:
                 if 'fan_speed' in command:
                     controller.set_fan_speed(int(command['fan_speed']))
+                
+                if 'fan_mode' in command:
+                    controller.set_fan_mode(str(command['fan_mode']))
                 
                 if 'main_loop' in command:
                     controller.set_main_loop(bool(command['main_loop']))

@@ -240,61 +240,37 @@
       min-width: 50px;
     }
 
-    .fan-controls {
+    .fan-mode-controls {
       display: flex;
       gap: 15px;
       align-items: center;
+      flex-wrap: wrap;
     }
 
-    input[type="number"] {
-      width: 80px;
-      padding: 8px;
-      font-size: 16px;
-      border: 2px solid #555;
-      border-radius: 4px;
-      background: #333;
+    .fan-mode-btn {
+      min-width: 110px;
+      padding: 10px 16px;
+      border: 2px solid #666;
+      border-radius: 6px;
+      background: #2d2d2d;
       color: #fff;
-    }
-
-    input[type="number"]:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    input[type="range"] {
-      flex: 1;
-      height: 8px;
-      border-radius: 5px;
-      background: #555;
-      outline: none;
-      -webkit-appearance: none;
-    }
-
-    input[type="range"]::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 20px;
-      height: 20px;
-      border-radius: 50%;
-      background: #4CAF50;
+      font-size: 15px;
+      font-weight: 700;
       cursor: pointer;
+      transition: all 0.15s ease;
     }
 
-    input[type="range"]::-moz-range-thumb {
-      width: 20px;
-      height: 20px;
-      border-radius: 50%;
-      background: #4CAF50;
-      cursor: pointer;
-      border: none;
+    .fan-mode-btn:hover {
+      background: #3a3a3a;
     }
 
-    input[type="range"]:disabled::-webkit-slider-thumb {
-      background: #666;
-      cursor: not-allowed;
+    .fan-mode-btn.active {
+      border-color: #4CAF50;
+      background: #1f5e2a;
+      box-shadow: 0 0 0 1px rgba(76, 175, 80, 0.35);
     }
 
-    input[type="range"]:disabled {
+    .fan-mode-btn:disabled {
       opacity: 0.5;
       cursor: not-allowed;
     }
@@ -360,10 +336,11 @@
     </div>
     
     <div class="control-group">
-      <label>Fan Speed (0-100)</label>
-      <div class="fan-controls">
-        <input type="number" id="fanSpeedInput" min="0" max="100" value="0">
-        <input type="range" id="fanSpeedSlider" min="0" max="100" value="0">
+      <label>Fan Mode</label>
+      <div class="fan-mode-controls">
+        <button type="button" id="fanModeOff" class="fan-mode-btn" data-mode="off">OFF</button>
+        <button type="button" id="fanMode5v" class="fan-mode-btn" data-mode="5v">5V</button>
+        <button type="button" id="fanMode12v" class="fan-mode-btn" data-mode="12v">12V</button>
       </div>
     </div>
     
@@ -399,15 +376,15 @@ let currentMode = 'manual';
 // Ignore windows for manual mode (timestamps when to stop ignoring)
 const ignoreWindows = {
   main_loop: 0,
-  diversion: 0,
-  fan_speed: 0
+  diversion: 0
 };
 
 const expectedStates = {
   main_loop: null,
-  diversion: null,
-  fan_speed: null
+  diversion: null
 };
+
+let currentFanMode = '12v';
 
 function connectWebSocket() {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -451,8 +428,6 @@ function updateDisplay(data) {
   // Update control states
   const mainLoopToggle = document.getElementById('mainLoopToggle');
   const diversionToggle = document.getElementById('diversionToggle');
-  const fanSpeedInput = document.getElementById('fanSpeedInput');
-  const fanSpeedSlider = document.getElementById('fanSpeedSlider');
   
   // Main loop toggle - only block updates that would CHANGE the current state
   const inIgnoreWindowMain = Date.now() < ignoreWindows.main_loop;
@@ -474,12 +449,13 @@ function updateDisplay(data) {
     }
   }
   
-  // Fan controls - update if not ignoring and not focused
-  if (!shouldIgnoreUpdate('fan_speed', data.fan_speed)) {
-    if (document.activeElement !== fanSpeedInput && document.activeElement !== fanSpeedSlider) {
-      fanSpeedInput.value = data.fan_speed;
-      fanSpeedSlider.value = data.fan_speed;
-    }
+  // Fan mode buttons (status-driven from backend)
+  if (data.fan_mode) {
+    currentFanMode = String(data.fan_mode).toLowerCase();
+    setActiveFanMode(currentFanMode);
+  } else if (data.fan_voltage !== undefined) {
+    currentFanMode = data.fan_voltage <= 0 ? 'off' : (data.fan_voltage <= 5 ? '5v' : '12v');
+    setActiveFanMode(currentFanMode);
   }
   
   // Update Save toggle state
@@ -527,6 +503,7 @@ function switchMode(mode) {
   const modeBadge = document.getElementById('modeBadge');
   const modeToggle = document.getElementById('modeToggle');
   const automationNotice = document.getElementById('automationNotice');
+  const fanModeButtons = document.querySelectorAll('.fan-mode-btn');
   
   modeToggle.checked = (mode === 'automatic');
   
@@ -537,14 +514,12 @@ function switchMode(mode) {
     
     document.getElementById('mainLoopToggle').disabled = true;
     document.getElementById('diversionToggle').disabled = true;
-    document.getElementById('fanSpeedInput').disabled = true;
-    document.getElementById('fanSpeedSlider').disabled = true;
+    fanModeButtons.forEach((btn) => { btn.disabled = true; });
     
     automationNotice.className = 'automation-notice visible';
     
     ignoreWindows.main_loop = 0;
     ignoreWindows.diversion = 0;
-    ignoreWindows.fan_speed = 0;
   } else {
     modeSelector.className = 'mode-selector manual';
     modeBadge.className = 'mode-badge manual';
@@ -552,11 +527,16 @@ function switchMode(mode) {
     
     document.getElementById('mainLoopToggle').disabled = false;
     document.getElementById('diversionToggle').disabled = false;
-    document.getElementById('fanSpeedInput').disabled = false;
-    document.getElementById('fanSpeedSlider').disabled = false;
+    fanModeButtons.forEach((btn) => { btn.disabled = false; });
     
     automationNotice.className = 'automation-notice';
   }
+}
+
+function setActiveFanMode(mode) {
+  document.querySelectorAll('.fan-mode-btn').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.mode === mode);
+  });
 }
 
 function sendCommand(command) {
@@ -596,44 +576,12 @@ document.getElementById('diversionToggle').addEventListener('change', (e) => {
   sendCommand({ diversion: state });
 });
 
-document.getElementById('fanSpeedInput').addEventListener('input', (e) => {
-  const value = parseInt(e.target.value) || 0;
-  const clamped = Math.max(0, Math.min(100, value));
-  document.getElementById('fanSpeedSlider').value = clamped;
-});
-
-document.getElementById('fanSpeedInput').addEventListener('change', (e) => {
-  const value = parseInt(e.target.value) || 0;
-  const clamped = Math.max(0, Math.min(100, value));
-  setIgnoreWindow('fan_speed', 500);
-  setExpectedState('fan_speed', clamped);
-  sendCommand({ fan_speed: clamped });
-});
-
-document.getElementById('fanSpeedSlider').addEventListener('mousedown', () => {
-  setIgnoreWindow('fan_speed', 500);
-});
-document.getElementById('fanSpeedSlider').addEventListener('touchstart', () => {
-  setIgnoreWindow('fan_speed', 500);
-});
-
-document.getElementById('fanSpeedSlider').addEventListener('input', (e) => {
-  const value = parseInt(e.target.value);
-  document.getElementById('fanSpeedInput').value = value;
-});
-
-document.getElementById('fanSpeedSlider').addEventListener('mouseup', (e) => {
-  const value = parseInt(e.target.value);
-  setIgnoreWindow('fan_speed', 500);
-  setExpectedState('fan_speed', value);
-  sendCommand({ fan_speed: value });
-});
-
-document.getElementById('fanSpeedSlider').addEventListener('touchend', (e) => {
-  const value = parseInt(e.target.value);
-  setIgnoreWindow('fan_speed', 500);
-  setExpectedState('fan_speed', value);
-  sendCommand({ fan_speed: value });
+document.querySelectorAll('.fan-mode-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const mode = btn.dataset.mode;
+    setActiveFanMode(mode); // optimistic UI
+    sendCommand({ fan_mode: mode });
+  });
 });
 
 document.getElementById('saveToggle').addEventListener('change', (e) => {

@@ -52,7 +52,7 @@ Integrated shop heater control system combining multiple Raspberry Pi GPIO modul
 This project integrates four separate codebases into a unified shop heater control system with real-time web interface.
 
 **Hardware Modules:**
-1. **raspi-bts7960** - Fan speed control (PWM motor driver)
+1. **raspi-bts7960** - Legacy fan control module (kept for historical reference)
 2. **raspi-ds18b20** - Temperature sensing (1-Wire sensors)
 3. **raspi-flowmeter** - Water flow measurement (pulse counter)
 4. **raspi-relay-shopheater** - Solenoid valve control (relay switching)
@@ -120,7 +120,7 @@ The server automatically binds to all network interfaces (`0.0.0.0`), making it 
 - 6 temperature sensors with calibration offsets, color-coded by temperature
 - 3 calculated temperature deltas
 - Flow rate (L/min)
-- Current fan speed
+- Current fan mode/voltage (`OFF`, `5V`, `12V`)
 - Dynamic visual flow diagram with color-coded arrows
 - Reservoir image changes color based on temperature (blue/orange/red)
 
@@ -136,7 +136,7 @@ The server automatically binds to all network interfaces (`0.0.0.0`), making it 
 - Mode selector (Manual/Automatic)
 - Main loop solenoid toggle
 - Diversion solenoid toggle
-- Fan speed slider (0-100) and text input
+- Fan mode buttons: `OFF`, `5V`, `12V`
 - Data logging toggle (Save button)
 - Live graphing toggle (Graph button)
 
@@ -180,7 +180,7 @@ The server automatically binds to all network interfaces (`0.0.0.0`), making it 
 - Scatter plots (X = parameter) or time series (X = time)
 
 **Filters:**
-- Fan speed range (min/max)
+- Fan voltage range (min/max)
 - Flow mode selection (main, diversion, mix, none)
 
 **Analysis Features:**
@@ -189,8 +189,8 @@ The server automatically binds to all network interfaces (`0.0.0.0`), making it 
 - Export filtered data as new CSV file
 
 **Example Use Cases:**
-- Fan Speed vs Delta Radiator: "How does fan speed affect heat transfer?"
-- Delta Heater vs Delta Radiator (filtered by fan speed): "At 50% fan, how does heater input relate to output?"
+- Fan Voltage vs Delta Radiator: "How does `0V/5V/12V` fan operation affect heat transfer?"
+- Delta Heater vs Delta Radiator (filtered by fan voltage): "At 5V fan, how does heater input relate to output?"
 - Time vs Multiple Temperatures: "How do all temps change over a session?"
 
 See [UI_REORGANIZATION.md](UI_REORGANIZATION.md) for detailed architecture documentation.
@@ -202,12 +202,30 @@ See [UI_REORGANIZATION.md](UI_REORGANIZATION.md) for detailed architecture docum
 | GPIO | Pin | Module | Function |
 |------|-----|--------|----------|
 | 4    | 7   | DS18B20 | Temperature (1-Wire, required) |
-| 18   | 12  | BTS7960 | Fan PWM control |
-| 23   | 16  | Relay   | Normal flow solenoid |
-| 24   | 18  | Relay   | Diversion flow solenoid |
+| 18   | 12  | Relay | Fan ON/OFF relay (`LOW` NC = ON, `HIGH` NO = OFF) |
+| 17   | 11  | Relay | Fan supply select (`LOW` NC = 12V, `HIGH` NO = 5V) |
+| 23   | 16  | Relay | Normal flow solenoid |
+| 24   | 18  | Relay | Diversion flow solenoid |
 | 27   | 13  | Flowmeter | Pulse counter |
 
 **No conflicts** - all modules use separate GPIO pins.
+
+### Fan Relay Logic (Intentional Fail-Safe)
+
+- **Default NC behavior is intentional:** if relays drop to NC, fans run at **12V**.
+- `GPIO18` (fan ON/OFF relay):
+  - `LOW` (NC): fans ON
+  - `HIGH` (NO): fans OFF
+- `GPIO17` (voltage select relay):
+  - `LOW` (NC): 12V supply
+  - `HIGH` (NO): 5V supply
+- Fan modes:
+  - `OFF` = `GPIO18 HIGH` (voltage relay unchanged)
+  - `5V` = `GPIO17 HIGH` and `GPIO18 LOW`
+  - `12V` = `GPIO17 LOW` and `GPIO18 LOW`
+
+> **Legacy note:** BTS7960 PWM control is retained in this repo for history/reference.  
+> In this heater application, the PWM driver did not interact well with the fans' internal BLDC driver, so control moved to relay-selected OFF/5V/12V.
 
 ---
 
@@ -262,13 +280,13 @@ pip install -r requirements.txt
 
 \`\`\`python
 #!/usr/bin/env python3
-from bts7960_controller import BTS7960Controller
+from fan_relay_controller import FanRelayController
 from ds18b20_reader import DS18B20Reader
 from flowmeter import FlowMeter
 from relay_control import RelayController
 
 # Initialize all modules
-fan = BTS7960Controller()
+fan = FanRelayController(fan_onoff_pin=18, voltage_select_pin=17)
 temp_reader = DS18B20Reader()
 flow_meter = FlowMeter(gpio_pin=27)
 valve_control = RelayController()
@@ -276,7 +294,7 @@ valve_control = RelayController()
 try:
     # Set initial state
     valve_control.mainLoop()
-    fan.set_speed(50)
+    fan.set_mode("12v")
     
     # Your control logic here
     
@@ -338,7 +356,8 @@ See \`example_integration.py\` for a complete working example.
 ├── ARROW_ROTATIONS.md              # Visual flow diagram logic
 ├── IMPLEMENTATION_SUMMARY.md       # UI improvements summary
 │
-├── bts7960_controller.py           # Fan controller
+├── fan_relay_controller.py         # Active fan relay controller (OFF/5V/12V)
+├── bts7960_controller.py           # Legacy PWM fan controller (historical)
 ├── ds18b20_reader.py               # Temperature sensors
 ├── flowmeter.py                    # Flow meter
 ├── relay_control.py                # Relay control

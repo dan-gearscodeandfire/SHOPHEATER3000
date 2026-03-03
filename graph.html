@@ -217,9 +217,36 @@ const dataSeries = {
   ],
   other: [
     { key: 'flow_rate', label: 'Flow Rate (L/min)', color: '#009688' },
-    { key: 'fan_speed', label: 'Fan Speed (%)', color: '#795548' }
+    { key: 'fan_voltage', label: 'Fan Voltage (V)', color: '#795548' }
   ]
 };
+
+function fanModeToVoltage(mode) {
+  const normalized = String(mode || '').toLowerCase();
+  if (normalized === 'off') return 0;
+  if (normalized === '5v') return 5;
+  if (normalized === '12v') return 12;
+  return 0;
+}
+
+function fanSpeedToVoltage(speed) {
+  const parsed = parseFloat(speed);
+  if (isNaN(parsed)) return 0;
+  if (parsed <= 0) return 0;
+  if (parsed <= 71) return 5;
+  return 12;
+}
+
+function getFanVoltage(point) {
+  if (point.fan_voltage !== undefined && point.fan_voltage !== null && point.fan_voltage !== '') {
+    const direct = parseFloat(point.fan_voltage);
+    if (!isNaN(direct)) return direct;
+  }
+  if (point.fan_mode !== undefined && point.fan_mode !== null) {
+    return fanModeToVoltage(point.fan_mode);
+  }
+  return fanSpeedToVoltage(point.fan_speed);
+}
 
 // Flatten all series
 const allSeries = [
@@ -441,7 +468,7 @@ async function loadHistoricalSession(filename) {
           delta_water_radiator: point.delta_water_radiator || 0,
           delta_air: point.delta_air || 0,
           flow_rate: point.flow_rate || 0,
-          fan_speed: point.fan_speed || 0
+          fan_voltage: getFanVoltage(point)
         }
       };
     });
@@ -507,7 +534,7 @@ function connectWebSocket() {
           delta_air: data.deltas?.delta_air || 0,
           // Other
           flow_rate: data.flow_rate || 0,
-          fan_speed: data.fan_speed || 0
+          fan_voltage: getFanVoltage(data)
         }
       };
       

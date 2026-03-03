@@ -780,8 +780,14 @@ function updateDisplay(data) {
   // Update flow rate
   updateValue('flow_rate', data.flow_rate, '');
   
-  // Update fan speed display
-  updateValue('fan_speed_display', data.fan_speed, '%');
+  // Update fan mode display (fallback to legacy speed if needed)
+  if (data.fan_mode) {
+    updateValue('fan_speed_display', String(data.fan_mode).toUpperCase(), '');
+  } else if (data.fan_voltage !== undefined) {
+    updateValue('fan_speed_display', `${data.fan_voltage}V`, '');
+  } else {
+    updateValue('fan_speed_display', '--', '');
+  }
   
   // Update control states based on mode (only if controls exist on this page)
   const mainLoopToggle = document.getElementById('mainLoopToggle');

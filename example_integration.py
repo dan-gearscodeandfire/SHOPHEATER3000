@@ -3,7 +3,7 @@
 SHOPHEATER3000 - Basic Integration Example
 
 Demonstrates how to use all four modules together in a single script.
-This is a simple temperature-based fan control example.
+This is a simple temperature-based fan mode control example.
 """
 
 import time
@@ -11,7 +11,7 @@ import signal
 import sys
 
 # Import all the controller classes
-from bts7960_controller import BTS7960Controller
+from fan_relay_controller import FanRelayController
 from ds18b20_reader import DS18B20Reader
 from flowmeter import FlowMeter
 from relay_control import RelayController
@@ -31,14 +31,14 @@ class ShopHeater:
         print("Initializing SHOPHEATER3000...")
         
         # Initialize modules
-        self.fan = BTS7960Controller(rpwm_pin=18, pwm_freq=10000)
+        self.fan = FanRelayController(fan_onoff_pin=18, voltage_select_pin=17)
         self.temp_reader = DS18B20Reader()
         self.flow_meter = FlowMeter(gpio_pin=27)
         self.valve_control = RelayController()
         
         # Set initial state
         self.valve_control.mainLoop()  # Normal flow path
-        self.fan.set_speed(0)  # Fans off
+        self.fan.set_mode("12v")  # Default relay fail-safe state
         
         # Initialize flow rate tracking
         self.flow_meter.getFlowRate()
@@ -46,7 +46,8 @@ class ShopHeater:
         print("All modules initialized.")
         print("GPIO pin allocation:")
         print("  GPIO 4  - DS18B20 Temperature Sensor")
-        print("  GPIO 18 - BTS7960 Fan Control (PWM)")
+        print("  GPIO 18 - Fan ON/OFF relay (NC ON, NO OFF)")
+        print("  GPIO 17 - Fan voltage relay (NC 12V, NO 5V)")
         print("  GPIO 23 - Relay (Normal Solenoid)")
         print("  GPIO 24 - Relay (Diversion Solenoid)")
         print("  GPIO 27 - Flow Meter Pulse Counter")
@@ -77,29 +78,29 @@ class ShopHeater:
     
     def temperature_control(self, temp_f):
         """
-        Adjust fan speed based on temperature.
+        Adjust fan mode based on temperature.
         
         Args:
             temp_f: Temperature in Fahrenheit
         
         Returns:
-            int: Fan speed percentage set
+            str: Fan mode set
         """
         if temp_f is None:
-            return 0
+            return "off"
         
-        # Simple temperature-based fan control
+        # Simple temperature-based fan control using relay modes
         if temp_f < 140:      # Below 140°F
-            fan_speed = 30
+            fan_mode = "5v"
         elif temp_f < 158:    # 140-158°F
-            fan_speed = 50
+            fan_mode = "5v"
         elif temp_f < 176:    # 158-176°F
-            fan_speed = 70
+            fan_mode = "12v"
         else:                 # Above 176°F
-            fan_speed = 90
+            fan_mode = "12v"
         
-        self.fan.set_speed(fan_speed)
-        return fan_speed
+        self.fan.set_mode(fan_mode)
+        return fan_mode
     
     def run(self, interval=2):
         """
@@ -120,12 +121,12 @@ class ShopHeater:
                 
                 # Control fan based on temperature
                 if state['temp_f'] is not None:
-                    fan_speed = self.temperature_control(state['temp_f'])
+                    fan_mode = self.temperature_control(state['temp_f'])
                     
                     # Display status
                     print(f"[{time.strftime('%H:%M:%S')}] "
                           f"Temp: {state['temp_f']:.1f}°F ({state['temp_c']:.1f}°C) | "
-                          f"Fan: {fan_speed:2d}% | "
+                          f"Fan: {fan_mode.upper():>3} | "
                           f"Flow: {state['flow_rate_lpm']:.2f} L/min | "
                           f"Total: {state['total_pounds']:.2f} lbs ({state['total_liters']:.2f} L)")
                 else:
@@ -141,7 +142,6 @@ class ShopHeater:
         print("Cleaning up GPIO resources...")
         
         try:
-            self.fan.stop()
             self.fan.cleanup()
             print("  ✓ Fan controller cleaned up")
         except Exception as e:
