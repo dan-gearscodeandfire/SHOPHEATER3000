@@ -10,6 +10,8 @@ import csv
 from datetime import datetime
 from typing import Dict, Optional, List
 from pathlib import Path
+from collections import deque
+import time
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
@@ -24,6 +26,14 @@ from relay_control import RelayController
 
 class ShopHeaterController:
     """Main controller integrating all hardware modules."""
+
+    AUTO_FAN_WARM_AIR_F = 60.0
+    AUTO_FAN_WARM_DELTA_AIR_F = 10.0
+    AUTO_FAN_PREDICTIVE_12V_F = 185.0
+    AUTO_VALVE_PREDICTIVE_DIVERSION_F = 195.0
+    AUTO_VALVE_RETURN_HOT_F = 180.0
+    AUTO_VALVE_RETURN_HOLD_S = 120.0
+    AUTO_COOLDOWN_DOWNSTEP_HOLD_S = 25.0
     
     # Sensor calibration offsets from ice water test (Jan 9, 2026)
     # Subtract these values from raw Celsius readings to get calibrated temps
@@ -65,6 +75,18 @@ class ShopHeaterController:
         self.graph_data = []  # Data collected when graph_enabled is True
         self.save_start_time = None  # Timestamp when logging started
         self.graph_start_time = None  # Timestamp when graphing started
+
+        # Automatic control state
+        self._auto_delta_heater_history = deque(maxlen=12)  # ~60 seconds at 5s cadence
+        self._auto_hot_history = deque(maxlen=12)  # ~60 seconds at 5s cadence
+        self._auto_last_predicted_hot = None
+        self._auto_force_diversion = False
+        self._auto_below_return_since = None
+        self._auto_pending_downstep = None
+        self._auto_last_off_pulse = 0.0
+        self._auto_fan_target = "off"
+        self._auto_reason = "Automatic mode inactive"
+        self._auto_return_hold_remaining_s = None
         
         # Set initial safe state - CRITICAL: Both valves must be open for circulation
         # Never close both valves - this creates dangerous error state with no flow path
@@ -165,6 +187,11 @@ class ShopHeaterController:
             'diversion_state': self.diversion_state,
             'control_mode': self.control_mode,
             'flow_mode': self.flow_mode,
+            'predicted_hot': self._auto_last_predicted_hot,
+            'auto_force_diversion': self._auto_force_diversion,
+            'auto_fan_target': self._auto_fan_target,
+            'auto_reason': self._auto_reason,
+            'auto_return_hold_remaining_s': self._auto_return_hold_remaining_s,
             'save_enabled': self.save_enabled,
             'graph_enabled': self.graph_enabled
         }
@@ -256,8 +283,206 @@ class ShopHeaterController:
         if mode in ['manual', 'automatic']:
             self.control_mode = mode
             print(f"Control mode set to: {mode.upper()}")
+            if mode == "automatic":
+                self._auto_below_return_since = None
+                self._auto_pending_downstep = None
+                self._auto_force_diversion = False
         else:
             print(f"Invalid control mode: {mode}. Must be 'manual' or 'automatic'.")
+
+    def _compute_rate_f_per_min(self, history: deque) -> float:
+        """Compute slope from oldest/newest sample in F/min."""
+        if len(history) < 2:
+            return 0.0
+
+        t0, v0 = history[0]
+        t1, v1 = history[-1]
+        dt = t1 - t0
+        if dt <= 0:
+            return 0.0
+
+        return (v1 - v0) / dt * 60.0
+
+    def _set_fan_mode_if_changed(self, mode: str):
+        """Avoid redundant relay writes/noise."""
+        if self.current_fan_mode != mode:
+            self.set_fan_mode(mode)
+
+    def _set_flow_main_only(self):
+        """Main loop open, diversion closed."""
+        self.set_main_loop(True)
+        self.set_diversion(False)
+
+    def _set_flow_diversion_only(self):
+        """Main loop closed, diversion open."""
+        self.set_main_loop(False)
+        self.set_diversion(True)
+
+    def run_automatic_control(self):
+        """
+        Automatic mode:
+        - Keep fans OFF until air is warm enough (comfort gate)
+        - Then default to 5V
+        - Escalate to 12V early based on predicted hot-water rise
+        - Force diversion-only when predicted hot risk exceeds threshold
+        - Recover to main-only after sustained cooldown
+        """
+        if self.control_mode != "automatic":
+            self._auto_fan_target = self.current_fan_mode
+            self._auto_reason = "Automatic mode inactive"
+            self._auto_return_hold_remaining_s = None
+            return
+
+        data = self.read_sensor_data()
+        temps = data.get("temperatures", {})
+        deltas = data.get("deltas", {})
+
+        water_hot = temps.get("water_hot")
+        water_cold = temps.get("water_cold")
+        air_heated = temps.get("air_heated")
+        delta_air = deltas.get("delta_air")
+        delta_heater = deltas.get("delta_water_heater")
+        flow_rate = data.get("flow_rate")
+
+        now = time.monotonic()
+
+        # Track recent trends for predictive logic
+        if delta_heater is not None:
+            self._auto_delta_heater_history.append((now, float(delta_heater)))
+        if water_hot is not None:
+            self._auto_hot_history.append((now, float(water_hot)))
+
+        roc_delta_heater = self._compute_rate_f_per_min(self._auto_delta_heater_history)
+        roc_hot = self._compute_rate_f_per_min(self._auto_hot_history)
+
+        predicted_hot = None
+        if water_hot is not None:
+            predicted_hot = float(water_hot)
+            # 30-second lookahead from hot trend
+            predicted_hot += max(0.0, roc_hot) * 0.5
+
+            # Additional predictor based on heater-lift acceleration and return temp.
+            if water_cold is not None and delta_heater is not None:
+                projected_from_heater = float(water_cold) + float(delta_heater) + max(0.0, roc_delta_heater) * 0.5
+                predicted_hot = max(predicted_hot, projected_from_heater)
+
+        self._auto_last_predicted_hot = round(predicted_hot, 1) if predicted_hot is not None else None
+
+        # ---------- Valve automatic logic ----------
+        emergency_flow_collapse = (
+            flow_rate is not None and water_hot is not None and
+            float(flow_rate) < 0.5 and float(water_hot) >= 170.0
+        )
+        diversion_trigger = (
+            predicted_hot is not None and predicted_hot >= self.AUTO_VALVE_PREDICTIVE_DIVERSION_F
+        ) or (
+            water_hot is not None and float(water_hot) >= self.AUTO_VALVE_PREDICTIVE_DIVERSION_F
+        ) or emergency_flow_collapse
+
+        if diversion_trigger:
+            self._auto_force_diversion = True
+            self._auto_below_return_since = None
+            self._auto_return_hold_remaining_s = None
+            self._set_flow_diversion_only()
+        elif self._auto_force_diversion:
+            can_start_return_timer = (
+                water_hot is not None and predicted_hot is not None and
+                float(water_hot) < self.AUTO_VALVE_RETURN_HOT_F and
+                float(predicted_hot) < self.AUTO_FAN_PREDICTIVE_12V_F and
+                roc_delta_heater <= 0.0 and roc_hot <= 0.0
+            )
+            if can_start_return_timer:
+                if self._auto_below_return_since is None:
+                    self._auto_below_return_since = now
+                    self._auto_return_hold_remaining_s = int(self.AUTO_VALVE_RETURN_HOLD_S)
+                elif (now - self._auto_below_return_since) >= self.AUTO_VALVE_RETURN_HOLD_S:
+                    self._auto_force_diversion = False
+                    self._auto_below_return_since = None
+                    self._auto_return_hold_remaining_s = None
+                    self._set_flow_main_only()
+                else:
+                    remaining = self.AUTO_VALVE_RETURN_HOLD_S - (now - self._auto_below_return_since)
+                    self._auto_return_hold_remaining_s = max(0, int(remaining))
+            else:
+                self._auto_below_return_since = None
+                self._auto_return_hold_remaining_s = None
+        else:
+            # Normal automatic baseline is main-loop only for shop heating.
+            self._auto_return_hold_remaining_s = None
+            self._set_flow_main_only()
+
+        # ---------- Fan automatic logic ----------
+        warmed_gate = (
+            (air_heated is not None and float(air_heated) >= self.AUTO_FAN_WARM_AIR_F) or
+            (delta_air is not None and float(delta_air) > self.AUTO_FAN_WARM_DELTA_AIR_F)
+        )
+
+        should_force_12v = (
+            (predicted_hot is not None and predicted_hot >= self.AUTO_FAN_PREDICTIVE_12V_F) or
+            (water_hot is not None and float(water_hot) >= 175.0) or
+            (delta_heater is not None and float(delta_heater) >= 45.0) or
+            (roc_delta_heater >= 10.0) or
+            emergency_flow_collapse
+        )
+
+        if should_force_12v:
+            desired_fan = "12v"
+        elif warmed_gate:
+            desired_fan = "5v"
+        else:
+            desired_fan = "off"
+        self._auto_fan_target = desired_fan
+
+        # Brief pulse while mostly OFF to avoid latent boil when near risk.
+        near_risk_while_off = (
+            desired_fan == "off" and predicted_hot is not None and predicted_hot >= 175.0
+        )
+        if near_risk_while_off:
+            if (now - self._auto_last_off_pulse) >= 20.0:
+                self._set_fan_mode_if_changed("5v")
+                self._auto_last_off_pulse = now
+                self._auto_reason = "Near-risk anti-boil pulse: forcing brief 5V while OFF target"
+                return
+
+        # If temperatures are rising, allow immediate transitions (even chatter).
+        # If cooling, hold downshifts for a short period to avoid relay chatter.
+        cooling_trend = roc_hot <= 0.0 and roc_delta_heater <= 0.0
+        current_fan = self.current_fan_mode
+        fan_order = {"off": 0, "5v": 1, "12v": 2}
+        is_downshift = fan_order.get(desired_fan, 0) < fan_order.get(current_fan, 0)
+
+        if not is_downshift:
+            self._auto_pending_downstep = None
+            self._set_fan_mode_if_changed(desired_fan)
+            if emergency_flow_collapse:
+                self._auto_reason = "Emergency flow collapse: forcing diversion + 12V"
+            elif self._auto_force_diversion:
+                self._auto_reason = "Diversion latched: predicted/actual hot exceeded 195F"
+            elif should_force_12v:
+                self._auto_reason = "Predictive safety cap near 185F: forcing 12V"
+            elif warmed_gate:
+                self._auto_reason = "Comfort gate met (air >= 60F or delta_air > 10F): running 5V"
+            else:
+                self._auto_reason = "Comfort gate not met: fans OFF to avoid cold blow"
+            return
+
+        if not cooling_trend:
+            self._auto_pending_downstep = None
+            self._set_fan_mode_if_changed(desired_fan)
+            self._auto_reason = "Rising trend: immediate fan transition allowed"
+            return
+
+        if self._auto_pending_downstep is None or self._auto_pending_downstep.get("target") != desired_fan:
+            self._auto_pending_downstep = {"target": desired_fan, "started": now}
+            self._auto_reason = (
+                f"Cooling trend: waiting {int(self.AUTO_COOLDOWN_DOWNSTEP_HOLD_S)}s before downshifting to {desired_fan.upper()}"
+            )
+            return
+
+        if (now - self._auto_pending_downstep["started"]) >= self.AUTO_COOLDOWN_DOWNSTEP_HOLD_S:
+            self._set_fan_mode_if_changed(desired_fan)
+            self._auto_pending_downstep = None
+            self._auto_reason = f"Cooling hold complete: downshifted to {desired_fan.upper()}"
     
     def set_save_enabled(self, state: bool):
         """
@@ -482,7 +707,8 @@ async def startup_event():
         # Start background tasks
         asyncio.create_task(sensor_broadcast_loop())
         asyncio.create_task(data_collection_loop())
-        print("Background tasks created (sensor broadcast + data collection)")
+        asyncio.create_task(automatic_control_loop())
+        print("Background tasks created (sensor broadcast + data collection + automatic control)")
     except Exception as e:
         print(f"ERROR IN STARTUP: {e}")
         import traceback
@@ -564,6 +790,21 @@ async def data_collection_loop():
                 traceback.print_exc()
 
 
+async def automatic_control_loop():
+    """Background task that runs automatic control logic every 5 seconds."""
+    print("Automatic control loop started")
+    while True:
+        await asyncio.sleep(5.0)
+
+        if controller:
+            try:
+                controller.run_automatic_control()
+            except Exception as e:
+                print(f"Error in automatic control: {e}")
+                import traceback
+                traceback.print_exc()
+
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     """WebSocket endpoint for real-time data and control."""
@@ -592,17 +833,31 @@ async def websocket_endpoint(websocket: WebSocket):
             
             # Process command
             if controller:
+                manual_override_allowed = controller.control_mode == "manual"
+
                 if 'fan_speed' in command:
-                    controller.set_fan_speed(int(command['fan_speed']))
+                    if manual_override_allowed:
+                        controller.set_fan_speed(int(command['fan_speed']))
+                    else:
+                        print("Ignoring fan_speed command in AUTOMATIC mode")
                 
                 if 'fan_mode' in command:
-                    controller.set_fan_mode(str(command['fan_mode']))
+                    if manual_override_allowed:
+                        controller.set_fan_mode(str(command['fan_mode']))
+                    else:
+                        print("Ignoring fan_mode command in AUTOMATIC mode")
                 
                 if 'main_loop' in command:
-                    controller.set_main_loop(bool(command['main_loop']))
+                    if manual_override_allowed:
+                        controller.set_main_loop(bool(command['main_loop']))
+                    else:
+                        print("Ignoring main_loop command in AUTOMATIC mode")
                 
                 if 'diversion' in command:
-                    controller.set_diversion(bool(command['diversion']))
+                    if manual_override_allowed:
+                        controller.set_diversion(bool(command['diversion']))
+                    else:
+                        print("Ignoring diversion command in AUTOMATIC mode")
                 
                 if 'control_mode' in command:
                     controller.set_control_mode(str(command['control_mode']))

@@ -154,6 +154,44 @@
       display: block;
     }
 
+    .auto-status-panel {
+      display: none;
+      background: rgba(255, 165, 0, 0.12);
+      border: 1px solid #ffb347;
+      border-radius: 6px;
+      padding: 12px;
+      margin-bottom: 18px;
+    }
+
+    .auto-status-panel.visible {
+      display: block;
+    }
+
+    .auto-status-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px 12px;
+      margin-bottom: 10px;
+    }
+
+    .auto-status-item {
+      font-size: 14px;
+      color: #ffe6bf;
+    }
+
+    .auto-status-item b {
+      color: #ffd18b;
+      margin-right: 6px;
+    }
+
+    .auto-reason {
+      font-size: 13px;
+      line-height: 1.4;
+      color: #ffe6bf;
+      border-top: 1px solid rgba(255, 209, 139, 0.35);
+      padding-top: 8px;
+    }
+
     .control-group {
       margin-bottom: 20px;
       padding-bottom: 20px;
@@ -310,7 +348,17 @@
     </div>
     
     <div class="automation-notice" id="automationNotice">
-      System is running automated logic - controls are read-only
+      System is running automated logic - valve and fan controls are read-only
+    </div>
+
+    <div class="auto-status-panel" id="autoStatusPanel">
+      <div class="auto-status-grid">
+        <div class="auto-status-item"><b>Predicted hot:</b><span id="autoPredictedHot">--</span></div>
+        <div class="auto-status-item"><b>Auto fan target:</b><span id="autoFanTarget">--</span></div>
+        <div class="auto-status-item"><b>Diversion latch:</b><span id="autoDiversionLatch">--</span></div>
+        <div class="auto-status-item"><b>Return timer:</b><span id="autoReturnTimer">--</span></div>
+      </div>
+      <div class="auto-reason"><b>Decision:</b> <span id="autoReasonText">--</span></div>
     </div>
     
     <div class="control-group">
@@ -475,6 +523,8 @@ function updateDisplay(data) {
       document.getElementById('graphLabel').textContent = data.graph_enabled ? 'ON' : 'OFF';
     }
   }
+
+  updateAutomaticStatus(data);
 }
 
 function shouldIgnoreUpdate(controlName, incomingValue) {
@@ -503,6 +553,7 @@ function switchMode(mode) {
   const modeBadge = document.getElementById('modeBadge');
   const modeToggle = document.getElementById('modeToggle');
   const automationNotice = document.getElementById('automationNotice');
+  const autoStatusPanel = document.getElementById('autoStatusPanel');
   const fanModeButtons = document.querySelectorAll('.fan-mode-btn');
   
   modeToggle.checked = (mode === 'automatic');
@@ -517,6 +568,7 @@ function switchMode(mode) {
     fanModeButtons.forEach((btn) => { btn.disabled = true; });
     
     automationNotice.className = 'automation-notice visible';
+    autoStatusPanel.className = 'auto-status-panel visible';
     
     ignoreWindows.main_loop = 0;
     ignoreWindows.diversion = 0;
@@ -530,7 +582,24 @@ function switchMode(mode) {
     fanModeButtons.forEach((btn) => { btn.disabled = false; });
     
     automationNotice.className = 'automation-notice';
+    autoStatusPanel.className = 'auto-status-panel';
   }
+}
+
+function updateAutomaticStatus(data) {
+  const predictedHot = (data.predicted_hot !== undefined && data.predicted_hot !== null) ? `${Number(data.predicted_hot).toFixed(1)} F` : '--';
+  const fanTarget = data.auto_fan_target ? String(data.auto_fan_target).toUpperCase() : '--';
+  const diversionLatch = data.auto_force_diversion ? 'ENGAGED' : 'CLEAR';
+  const returnTimer = (data.auto_return_hold_remaining_s !== undefined && data.auto_return_hold_remaining_s !== null)
+    ? `${data.auto_return_hold_remaining_s}s`
+    : '--';
+  const reasonText = data.auto_reason ? String(data.auto_reason) : '--';
+
+  document.getElementById('autoPredictedHot').textContent = predictedHot;
+  document.getElementById('autoFanTarget').textContent = fanTarget;
+  document.getElementById('autoDiversionLatch').textContent = diversionLatch;
+  document.getElementById('autoReturnTimer').textContent = returnTimer;
+  document.getElementById('autoReasonText').textContent = reasonText;
 }
 
 function setActiveFanMode(mode) {
