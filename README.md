@@ -3,8 +3,8 @@
 Integrated shop heater control system combining multiple Raspberry Pi GPIO modules with real-time web interface.
 
 **Created:** January 6, 2026  
-**Last Updated:** January 22, 2026  
-**Status:** ✅ Production-ready with dynamic UI, data logging, and historical analysis tools
+**Last Updated:** March 2, 2026  
+**Status:** ✅ Production-ready with automatic control, dynamic UI, data logging, and historical analysis tools
 
 ---
 
@@ -37,6 +37,7 @@ Integrated shop heater control system combining multiple Raspberry Pi GPIO modul
 **Getting Started:**
 - [Overview](#overview) - System overview
 - [Web UI Quick Start](#web-ui-quick-start) - Get the interface running
+- [Automatic Control Mode](#automatic-control-mode) - Fan/valve automation logic and thresholds
 - [Setup Instructions](#setup-instructions) - Hardware and software setup
 
 **Documentation:**
@@ -58,9 +59,15 @@ This project integrates four separate codebases into a unified shop heater contr
 4. **raspi-relay-shopheater** - Solenoid valve control (relay switching)
 
 **Key Features:**
+- **Automatic Control Mode:**
+  - Closed-loop fan and valve control with predictive safety logic
+  - Fans OFF until shop air is warm (comfort gate), then 5V, escalating to 12V
+  - Automatic diversion when predicted water temperature approaches unsafe levels
+  - Emergency flow-collapse detection with immediate protective response
+  - Live status panel on Controls page showing predictions, decisions, and timers
 - **Multi-Page Web UI:**
   - Dashboard: Real-time monitoring with dynamic visual flow diagram
-  - Controls: Dedicated control interface for solenoids, fan, and modes
+  - Controls: Dedicated control interface for solenoids, fan, and modes (Manual/Automatic)
   - Live Graph: Dynamic charting of selected parameters
   - Data Explorer: Browse and manage historical data sessions
 - **Dynamic Visual System:**
@@ -140,6 +147,13 @@ The server automatically binds to all network interfaces (`0.0.0.0`), making it 
 - Data logging toggle (Save button)
 - Live graphing toggle (Graph button)
 
+**Automatic Mode Status Panel (visible in Automatic mode):**
+- Predicted hot water temperature (30s lookahead)
+- Current automatic fan target (`OFF`, `5V`, `12V`)
+- Diversion latch state (`ENGAGED` / `CLEAR`)
+- Return-to-main countdown timer
+- Human-readable decision reason
+
 **Optimistic UI Updates:**
 - Controls respond instantly to user input
 - Smart ignore windows (500ms) prevent flickering
@@ -194,6 +208,56 @@ The server automatically binds to all network interfaces (`0.0.0.0`), making it 
 - Time vs Multiple Temperatures: "How do all temps change over a session?"
 
 See [UI_REORGANIZATION.md](UI_REORGANIZATION.md) for detailed architecture documentation.
+
+---
+
+## Automatic Control Mode
+
+Toggle between **Manual** and **Automatic** on the Controls page. In Automatic mode, fan speed and valve state are managed by the server; manual WebSocket commands for those controls are ignored.
+
+### Fan Logic (Comfort + Safety)
+
+| Condition | Fan Mode | Notes |
+|-----------|----------|-------|
+| `air_heated < 60°F` **and** `delta_air <= 10°F` | **OFF** | Comfort gate: avoid blowing cold air |
+| Comfort gate met | **5V** | Default low-speed once air is warm |
+| `predicted_hot >= 185°F`, or `water_hot >= 175°F`, or `delta_heater >= 45°F`, or `rate(delta_heater) >= 10°F/min` | **12V** | Predictive safety escalation |
+| Emergency flow collapse (`flow < 0.5 GPM` at `hot >= 170°F`) | **12V** | Immediate protective response |
+
+**Downshift behavior:** When temperatures are rising, fan transitions happen immediately (chatter is acceptable). When cooling, downshifts are held for 25 seconds to avoid relay chatter.
+
+**Anti-boil pulse:** If fan target is OFF but predicted hot is near 175°F, a brief 5V pulse fires every 20 seconds.
+
+### Valve Logic (Overheat Protection)
+
+| Condition | Valve State | Notes |
+|-----------|-------------|-------|
+| Normal operation | **Main-only** | Shop heating through radiator |
+| `predicted_hot >= 195°F`, or `water_hot >= 195°F`, or emergency flow collapse | **Diversion-only** | Bypass radiator to cool water through reservoir |
+| Diversion latched, `water_hot < 180°F` sustained, trends declining | Countdown starts (120s) | Return timer shown on Controls page |
+| Return timer expires with stable cooldown | **Main-only** | Resume shop heating |
+
+### Predictive Model
+
+The controller computes `predicted_hot` using a 30-second lookahead from two signals:
+1. **Rate of change of `water_hot`** over the last 60 seconds
+2. **Projected hot from heater lift:** `water_cold + delta_heater + rate(delta_heater) * 0.5 min`
+
+The higher of the two projections is used. This catches both steady temperature climbs and rapid fire-intensity ramps before they reach dangerous levels.
+
+### Configurable Thresholds
+
+All thresholds are class constants in `ShopHeaterController`:
+
+| Constant | Default | Purpose |
+|----------|---------|---------|
+| `AUTO_FAN_WARM_AIR_F` | 60°F | Comfort gate: minimum air temp to turn fans on |
+| `AUTO_FAN_WARM_DELTA_AIR_F` | 10°F | Comfort gate: minimum delta-air to turn fans on |
+| `AUTO_FAN_PREDICTIVE_12V_F` | 185°F | Predicted hot threshold for 12V escalation |
+| `AUTO_VALVE_PREDICTIVE_DIVERSION_F` | 195°F | Predicted hot threshold to force diversion |
+| `AUTO_VALVE_RETURN_HOT_F` | 180°F | Hot temp must drop below this to begin return timer |
+| `AUTO_VALVE_RETURN_HOLD_S` | 120s | Sustained cooldown duration before returning to main |
+| `AUTO_COOLDOWN_DOWNSTEP_HOLD_S` | 25s | Cooling-phase hysteresis before fan downshift |
 
 ---
 
@@ -362,9 +426,9 @@ See \`example_integration.py\` for a complete working example.
 ├── flowmeter.py                    # Flow meter
 ├── relay_control.py                # Relay control
 │
-├── shopheater3000.py               # Main web server (FastAPI + WebSocket)
+├── shopheater3000.py               # Main web server (FastAPI + WebSocket + automatic control)
 ├── web_ui.html                     # Dashboard (monitoring only)
-├── controls.html                   # Controls page (solenoids, fan, modes)
+├── controls.html                   # Controls page (solenoids, fan, modes, auto status)
 ├── graph.html                      # Live graphing page
 ├── explorer.html                   # Data explorer page
 │
@@ -413,10 +477,34 @@ See \`example_integration.py\` for a complete working example.
   - **Startup Default:** Both valves OPEN (mix mode) - ensures safe circulation path
   - **Automatic Override:** Prevents both valves from closing simultaneously
   - **Flow Monitoring:** Real-time flow mode calculation (main/diversion/mix/none)
+  - **Automatic Mode:** Predictive fan/valve control prevents overheating and boiling
+  - **Emergency Flow Collapse:** Immediate diversion + 12V fan on low-flow at high temp
+  - **Anti-Boil Pulse:** Brief fan activation when near risk threshold
 
 ---
 
 ## Changelog
+
+### 2026-03-02 (Automatic Control Mode)
+- **Automatic Fan Control:**
+  - Comfort gate: fans OFF until air >= 60°F or delta_air > 10°F, then 5V
+  - Predictive 12V escalation when predicted hot nears 185°F
+  - Emergency 12V on flow collapse (< 0.5 GPM at >= 170°F)
+  - Cooling-phase downshift hysteresis (25s hold); rising allows immediate chatter
+  - Anti-boil pulse: brief 5V every 20s when OFF but near 175°F predicted
+- **Automatic Valve Control:**
+  - Force diversion-only when predicted/actual water_hot >= 195°F
+  - Return to main-only after sustained cooldown below 180°F for 120s
+  - Return timer resets if temperatures rise again or trends reverse
+- **Controls Page:**
+  - Automatic status panel shows predicted hot, fan target, diversion latch, return timer, and decision reason
+  - Fan, solenoid, and valve controls disabled (read-only) in automatic mode
+  - WebSocket commands for fan/valve ignored server-side in automatic mode
+- **Backend:**
+  - `run_automatic_control()` runs every 5s via dedicated async loop
+  - 60-second rolling history for rate-of-change calculations
+  - Dual predictive model: hot trend + heater-lift projection
+  - All thresholds exposed as class constants for tuning
 
 ### 2026-01-22 (Critical Safety & Arrow Corrections)
 - **⚠️ SAFETY REQUIREMENT IMPLEMENTED:**
@@ -505,5 +593,5 @@ See \`example_integration.py\` for a complete working example.
 
 ---
 
-**Last Updated:** January 22, 2026  
-**System Status:** ✅ Production-ready with full data logging, graphing, historical analysis, and critical safety features
+**Last Updated:** March 2, 2026  
+**System Status:** ✅ Production-ready with automatic control, full data logging, graphing, historical analysis, and critical safety features
