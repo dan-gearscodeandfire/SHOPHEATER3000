@@ -29,11 +29,14 @@ class ShopHeaterController:
 
     AUTO_FAN_WARM_AIR_F = 60.0
     AUTO_FAN_WARM_DELTA_AIR_F = 10.0
-    AUTO_FAN_PREDICTIVE_12V_F = 185.0
-    AUTO_VALVE_PREDICTIVE_DIVERSION_F = 195.0
+    AUTO_FAN_PREDICTIVE_12V_F = 183.0
+    AUTO_VALVE_PREDICTIVE_DIVERSION_F = 193.0
     AUTO_VALVE_RETURN_HOT_F = 180.0
     AUTO_VALVE_RETURN_HOLD_S = 120.0
     AUTO_COOLDOWN_DOWNSTEP_HOLD_S = 25.0
+    AUTO_AIR_PROBE_MIN_HOT_F = 100.0
+    AUTO_AIR_PROBE_INTERVAL_S = 60.0
+    AUTO_AIR_PROBE_DURATION_S = 15.0
     
     # Sensor calibration offsets from ice water test (Jan 9, 2026)
     # Subtract these values from raw Celsius readings to get calibrated temps
@@ -87,6 +90,8 @@ class ShopHeaterController:
         self._auto_fan_target = "off"
         self._auto_reason = "Automatic mode inactive"
         self._auto_return_hold_remaining_s = None
+        self._auto_last_air_probe = 0.0
+        self._auto_air_probe_until = 0.0
         
         # Set initial safe state - CRITICAL: Both valves must be open for circulation
         # Never close both valves - this creates dangerous error state with no flow path
@@ -331,6 +336,7 @@ class ShopHeaterController:
             self._auto_fan_target = self.current_fan_mode
             self._auto_reason = "Automatic mode inactive"
             self._auto_return_hold_remaining_s = None
+            self._auto_air_probe_until = 0.0
             return
 
         data = self.read_sensor_data()
@@ -433,6 +439,32 @@ class ShopHeaterController:
             desired_fan = "off"
         self._auto_fan_target = desired_fan
 
+        # Air-delta probe: when target is OFF but water is hot enough to matter,
+        # briefly run 5V at intervals so delta_air remains measurable.
+        air_probe_eligible = (
+            desired_fan == "off" and
+            water_hot is not None and
+            float(water_hot) > self.AUTO_AIR_PROBE_MIN_HOT_F
+        )
+        if air_probe_eligible:
+            if now < self._auto_air_probe_until:
+                self._set_fan_mode_if_changed("5v")
+                self._auto_reason = (
+                    f"Air probe active: running 5V to refresh delta_air ({int(max(0, self._auto_air_probe_until - now))}s left)"
+                )
+                return
+
+            if (now - self._auto_last_air_probe) >= self.AUTO_AIR_PROBE_INTERVAL_S:
+                self._auto_last_air_probe = now
+                self._auto_air_probe_until = now + self.AUTO_AIR_PROBE_DURATION_S
+                self._set_fan_mode_if_changed("5v")
+                self._auto_reason = (
+                    f"Air probe started: 5V for {int(self.AUTO_AIR_PROBE_DURATION_S)}s (interval {int(self.AUTO_AIR_PROBE_INTERVAL_S)}s)"
+                )
+                return
+        else:
+            self._auto_air_probe_until = 0.0
+
         # Brief pulse while mostly OFF to avoid latent boil when near risk.
         near_risk_while_off = (
             desired_fan == "off" and predicted_hot is not None and predicted_hot >= 175.0
@@ -457,9 +489,13 @@ class ShopHeaterController:
             if emergency_flow_collapse:
                 self._auto_reason = "Emergency flow collapse: forcing diversion + 12V"
             elif self._auto_force_diversion:
-                self._auto_reason = "Diversion latched: predicted/actual hot exceeded 195F"
+                self._auto_reason = (
+                    f"Diversion latched: predicted/actual hot exceeded {int(self.AUTO_VALVE_PREDICTIVE_DIVERSION_F)}F"
+                )
             elif should_force_12v:
-                self._auto_reason = "Predictive safety cap near 185F: forcing 12V"
+                self._auto_reason = (
+                    f"Predictive safety cap near {int(self.AUTO_FAN_PREDICTIVE_12V_F)}F: forcing 12V"
+                )
             elif warmed_gate:
                 self._auto_reason = "Comfort gate met (air >= 60F or delta_air > 10F): running 5V"
             else:
